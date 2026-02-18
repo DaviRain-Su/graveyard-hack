@@ -42,25 +42,36 @@ class _SwapPageState extends State<SwapPage> {
         padding: EdgeInsets.all(Adapt.px(16)),
         child: Column(
           children: [
-            // Devnet warning
-            if (SolanaWalletService.instance.isDevnet)
+            // Devnet/Testnet warning
+            if (!SolanaWalletService.instance.isMainnet)
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(12),
                 margin: EdgeInsets.only(bottom: Adapt.px(12)),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.15),
+                  color: (SolanaWalletService.instance.isTestnet ? Colors.blueAccent : Colors.orange)
+                      .withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(
+                      color: (SolanaWalletService.instance.isTestnet ? Colors.blueAccent : Colors.orange)
+                          .withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    Icon(Icons.warning_amber,
+                        color: SolanaWalletService.instance.isTestnet
+                            ? Colors.blueAccent
+                            : Colors.orange,
+                        size: 20),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Jupiter swap is only available on Mainnet. Switch network to use swap.',
-                        style: TextStyle(color: Colors.orange, fontSize: 12),
+                        style: TextStyle(
+                            color: SolanaWalletService.instance.isTestnet
+                                ? Colors.blueAccent
+                                : Colors.orange,
+                            fontSize: 12),
                       ),
                     ),
                   ],
@@ -141,7 +152,7 @@ class _SwapPageState extends State<SwapPage> {
               ),
 
             // Mainnet warning
-            if (!SolanaWalletService.instance.isDevnet) ...[
+            if (SolanaWalletService.instance.isMainnet) ...[
               SizedBox(height: 8),
               Text(
                 '⚠️ Swaps are on Mainnet — real funds',

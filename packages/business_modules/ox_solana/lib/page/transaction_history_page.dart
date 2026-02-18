@@ -10,7 +10,8 @@ import '../models/transaction_record.dart';
 import '../services/solana_wallet_service.dart';
 
 class TransactionHistoryPage extends StatefulWidget {
-  const TransactionHistoryPage({super.key});
+  final String? highlightSignature;
+  const TransactionHistoryPage({super.key, this.highlightSignature});
 
   @override
   State<TransactionHistoryPage> createState() => _TransactionHistoryPageState();
@@ -24,6 +25,13 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
     super.initState();
     _walletService.addListener(_onChanged);
     _walletService.fetchHistory();
+
+    if (widget.highlightSignature != null) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        _showHighlightDialog(widget.highlightSignature!);
+      });
+    }
   }
 
   @override
@@ -34,6 +42,42 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
 
   void _onChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _showHighlightDialog(String signature) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text('Transaction Detail', style: TextStyle(color: ThemeColor.color0)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Signature', style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+            SizedBox(height: 6),
+            Text(signature,
+                style: TextStyle(color: ThemeColor.color0, fontFamily: 'monospace', fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: signature));
+              CommonToast.instance.show(context, 'Copied');
+            },
+            child: Text('Copy', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          TextButton(
+            onPressed: () {
+              final url = _walletService.getExplorerUrl(signature);
+              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            },
+            child: Text('View Explorer', style: TextStyle(color: Color(0xFF9945FF))),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

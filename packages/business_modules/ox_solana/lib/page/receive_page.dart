@@ -29,17 +29,26 @@ class ReceivePage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Network badge
-              if (SolanaWalletService.instance.isDevnet)
+              if (!SolanaWalletService.instance.isMainnet)
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   margin: EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.15),
+                    color: (SolanaWalletService.instance.isTestnet ? Colors.blueAccent : Colors.orange)
+                        .withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    border: Border.all(
+                        color: (SolanaWalletService.instance.isTestnet ? Colors.blueAccent : Colors.orange)
+                            .withOpacity(0.3)),
                   ),
-                  child: Text('⚠️ Devnet Address — test only',
-                      style: TextStyle(color: Colors.orange, fontSize: 12)),
+                  child: Text(
+                    '⚠️ ${SolanaWalletService.instance.networkName} address — test only',
+                    style: TextStyle(
+                        color: SolanaWalletService.instance.isTestnet
+                            ? Colors.blueAccent
+                            : Colors.orange,
+                        fontSize: 12),
+                  ),
                 ),
 
               // QR Code with gradient border

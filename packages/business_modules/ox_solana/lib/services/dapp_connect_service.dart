@@ -66,7 +66,7 @@ class DappConnectService {
       walletAddress: wallet.address,
       permissions: permissions,
       connectedAt: DateTime.now(),
-      isDevnet: wallet.isDevnet,
+      isDevnet: !wallet.isMainnet,
     );
 
     _sessions[session.id] = session;

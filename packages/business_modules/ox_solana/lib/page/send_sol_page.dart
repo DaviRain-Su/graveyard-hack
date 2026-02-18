@@ -294,7 +294,7 @@ class _SendSolPageState extends State<SendSolPage> {
             SizedBox(height: 10),
             _buildConfirmRow('Amount', '$amount SOL'),
             SizedBox(height: 10),
-            _buildConfirmRow('Network', _walletService.isDevnet ? 'Devnet' : 'Mainnet'),
+            _buildConfirmRow('Network', _walletService.networkName),
             SizedBox(height: 10),
             _buildConfirmRow('Fee', '~0.000005 SOL'),
           ],

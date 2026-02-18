@@ -17,6 +17,8 @@ import '../models/transaction_record.dart';
 
 /// Solana wallet service — manages ed25519 key pair, balance, and transfers.
 /// Key storage: encrypted via SharedPreferences (same as 0xchat Nostr key).
+enum SolanaNetwork { mainnet, devnet, testnet }
+
 class SolanaWalletService extends ChangeNotifier {
   static final SolanaWalletService instance = SolanaWalletService._();
   SolanaWalletService._();
@@ -56,11 +58,13 @@ class SolanaWalletService extends ChangeNotifier {
   // Override with setCustomRpc() for production (public endpoints have rate limits)
   static const String _defaultMainnetRpc = 'https://api.mainnet-beta.solana.com';
   static const String _defaultDevnetRpc = 'https://api.devnet.solana.com';
+  static const String _defaultTestnetRpc = 'https://api.testnet.solana.com';
   static const String _customRpcKey = 'ox_solana_custom_rpc';
 
   String? _customMainnetRpc;
   String get _mainnetRpc => _customMainnetRpc ?? _defaultMainnetRpc;
   String get _devnetRpc => _defaultDevnetRpc;
+  String get _testnetRpc => _defaultTestnetRpc;
 
   // Storage keys — private key & mnemonic go to SecureStorage (Keychain/Keystore)
   // Network preference stays in SharedPreferences (non-sensitive)
@@ -116,10 +120,34 @@ class SolanaWalletService extends ChangeNotifier {
   /// Whether wallet was created from mnemonic (can be backed up)
   bool get hasMnemonic => _mnemonic != null;
 
-  bool _isDevnet = false;
-  bool get isDevnet => _isDevnet;
+  SolanaNetwork _network = SolanaNetwork.mainnet;
+  bool get isDevnet => _network == SolanaNetwork.devnet;
+  bool get isTestnet => _network == SolanaNetwork.testnet;
+  bool get isMainnet => _network == SolanaNetwork.mainnet;
 
-  String get rpcUrl => _isDevnet ? _devnetRpc : _mainnetRpc;
+  String get rpcUrl {
+    switch (_network) {
+      case SolanaNetwork.devnet:
+        return _devnetRpc;
+      case SolanaNetwork.testnet:
+        return _testnetRpc;
+      case SolanaNetwork.mainnet:
+      default:
+        return _mainnetRpc;
+    }
+  }
+
+  String get networkName {
+    switch (_network) {
+      case SolanaNetwork.devnet:
+        return 'devnet';
+      case SolanaNetwork.testnet:
+        return 'testnet';
+      case SolanaNetwork.mainnet:
+      default:
+        return 'mainnet';
+    }
+  }
 
   /// Current effective RPC URL for display
   String get effectiveRpcUrl => rpcUrl;
@@ -151,6 +179,13 @@ class SolanaWalletService extends ChangeNotifier {
     // Load custom RPC before initializing client
     final prefs = await SharedPreferences.getInstance();
     _customMainnetRpc = prefs.getString(_customRpcKey);
+    final storedNetwork = prefs.getString(_networkKey);
+    if (storedNetwork != null) {
+      _network = SolanaNetwork.values.firstWhere(
+        (n) => n.name == storedNetwork,
+        orElse: () => SolanaNetwork.mainnet,
+      );
+    }
     _initClient();
     await _loadSavedWallet();
   }
@@ -162,14 +197,19 @@ class SolanaWalletService extends ChangeNotifier {
     );
   }
 
-  /// Switch between mainnet and devnet
-  Future<void> switchNetwork({required bool devnet}) async {
-    _isDevnet = devnet;
+  /// Switch between mainnet/devnet/testnet
+  Future<void> switchNetwork({required SolanaNetwork network}) async {
+    _network = network;
     _initClient();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_networkKey, devnet);
+    await prefs.setString(_networkKey, network.name);
     await refreshBalance();
     notifyListeners();
+  }
+
+  /// Backwards-compatible switch (mainnet/devnet)
+  Future<void> switchNetworkLegacy({required bool devnet}) async {
+    await switchNetwork(network: devnet ? SolanaNetwork.devnet : SolanaNetwork.mainnet);
   }
 
   /// Create a new Solana wallet from a fresh BIP39 mnemonic
@@ -479,7 +519,7 @@ class SolanaWalletService extends ChangeNotifier {
             if (uiAmount == 0) continue;
 
             // Lookup token metadata
-            final meta = WellKnownTokens.lookup(mint, isDevnet: _isDevnet);
+            final meta = WellKnownTokens.lookup(mint, isDevnet: isDevnet || isTestnet);
 
             tokenList.add(SplTokenInfo(
               mintAddress: mint,
@@ -658,13 +698,13 @@ class SolanaWalletService extends ChangeNotifier {
     }
   }
 
-  /// Request devnet airdrop (1 SOL)
+  /// Request devnet/testnet airdrop (1 SOL)
   Future<String> requestAirdrop({double amount = 1.0}) async {
     if (_keyPair == null || _client == null) {
       throw Exception('Wallet not initialized');
     }
-    if (!_isDevnet) {
-      throw Exception('Airdrop only available on devnet');
+    if (isMainnet) {
+      throw Exception('Airdrop only available on devnet/testnet');
     }
 
     try {
@@ -698,13 +738,21 @@ class SolanaWalletService extends ChangeNotifier {
 
   /// Get explorer URL for a transaction
   String getExplorerUrl(String signature) {
-    final cluster = _isDevnet ? '?cluster=devnet' : '';
+    final cluster = isDevnet
+        ? '?cluster=devnet'
+        : isTestnet
+            ? '?cluster=testnet'
+            : '';
     return 'https://explorer.solana.com/tx/$signature$cluster';
   }
 
   /// Get explorer URL for the wallet address
   String get addressExplorerUrl {
-    final cluster = _isDevnet ? '?cluster=devnet' : '';
+    final cluster = isDevnet
+        ? '?cluster=devnet'
+        : isTestnet
+            ? '?cluster=testnet'
+            : '';
     return 'https://explorer.solana.com/address/$address$cluster';
   }
 
@@ -730,7 +778,6 @@ class SolanaWalletService extends ChangeNotifier {
   Future<void> _loadSavedWallet() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _isDevnet = prefs.getBool(_networkKey) ?? false;
       _derivedFromNostr = prefs.getBool(_derivedFromNostrKey) ?? false;
 
       // Load from SecureStorage (or fallback)

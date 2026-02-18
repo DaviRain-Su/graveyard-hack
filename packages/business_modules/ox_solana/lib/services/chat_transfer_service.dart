@@ -170,14 +170,15 @@ class ChatTransferService {
         'signature': signature,
         'from_address': wallet.address,
         'to_address': recipientSolAddress,
-        'network': wallet.isDevnet ? 'devnet' : 'mainnet',
+        'network': wallet.networkName,
       };
 
       OXChatInterface.sendTemplateMessage(
         context,
         receiverPubkey: recipientNostrPubkey,
         title: '💸 SOL Transfer',
-        subTitle: '${amount.toStringAsFixed(4)} SOL sent',
+        subTitle: '${amount.toStringAsFixed(4)} SOL • ${wallet.networkName}',
+        icon: 'chat_sol_icon.png',
         link: 'solana:tx:$signature',
       );
 

@@ -320,7 +320,7 @@ class _RedPacketPageState extends State<RedPacketPage> {
             _type == RedPacketType.random ? 'Avg per person' : 'Per person',
             '$perPerson SOL',
           ),
-          _summaryRow('Network', SolanaWalletService.instance.isDevnet ? 'Devnet' : 'Mainnet'),
+          _summaryRow('Network', SolanaWalletService.instance.networkName),
         ],
       ),
     );

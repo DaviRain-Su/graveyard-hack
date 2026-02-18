@@ -64,11 +64,15 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         actions: [
           IconButton(
             icon: Icon(
-              _walletService.isDevnet ? Icons.bug_report : Icons.public,
-              color: _walletService.isDevnet ? Colors.orange : ThemeColor.color0,
+              _walletService.isMainnet ? Icons.public : Icons.bug_report,
+              color: _walletService.isMainnet
+                  ? ThemeColor.color0
+                  : _walletService.isTestnet
+                      ? Colors.blueAccent
+                      : Colors.orange,
             ),
-            onPressed: _toggleNetwork,
-            tooltip: _walletService.isDevnet ? 'Devnet' : 'Mainnet',
+            onPressed: _showNetworkPicker,
+            tooltip: _walletService.networkName,
           ),
         ],
       ),
@@ -171,20 +175,29 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         padding: EdgeInsets.all(Adapt.px(16)),
         children: [
           // Network indicator
-          if (_walletService.isDevnet)
+          if (!_walletService.isMainnet)
             Container(
               padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.2),
+                color: (_walletService.isTestnet ? Colors.blueAccent : Colors.orange)
+                    .withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.bug_report, size: 16, color: Colors.orange),
+                  Icon(Icons.bug_report,
+                      size: 16,
+                      color: _walletService.isTestnet
+                          ? Colors.blueAccent
+                          : Colors.orange),
                   SizedBox(width: 4),
-                  Text('Devnet Mode',
-                      style: TextStyle(color: Colors.orange, fontSize: 12)),
+                  Text('${_walletService.networkName} mode',
+                      style: TextStyle(
+                          color: _walletService.isTestnet
+                              ? Colors.blueAccent
+                              : Colors.orange,
+                          fontSize: 12)),
                 ],
               ),
             ),
@@ -239,8 +252,8 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
             ],
           ),
 
-          // Devnet Airdrop button
-          if (_walletService.isDevnet) ...[
+          // Devnet/Testnet Airdrop button
+          if (!_walletService.isMainnet) ...[
             SizedBox(height: Adapt.px(16)),
             _buildAirdropButton(),
           ],
@@ -329,7 +342,11 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _walletService.isDevnet ? '🟡 Devnet' : '🟢 Mainnet',
+                  _walletService.isMainnet
+                      ? '🟢 Mainnet'
+                      : _walletService.isTestnet
+                          ? '🔵 Testnet'
+                          : '🟡 Devnet',
                   style: TextStyle(color: Colors.white, fontSize: 11),
                 ),
               ),
@@ -370,7 +387,7 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                         children: [
                           Text('SOL',
                               style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
-                          if (PriceService.instance.solPrice > 0 && !_walletService.isDevnet) ...[
+                          if (PriceService.instance.solPrice > 0 && _walletService.isMainnet) ...[
                             SizedBox(width: 12),
                             Text(
                               '≈ ${PriceService.instance.formatUsdValue(_walletService.balance, 'So11111111111111111111111111111111111111112')}',
@@ -675,23 +692,26 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         padding: EdgeInsets.symmetric(vertical: Adapt.px(14)),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.orange.withOpacity(0.2),
-              Colors.amber.withOpacity(0.2),
-            ],
+            colors: _walletService.isTestnet
+                ? [Colors.blueAccent.withOpacity(0.2), Colors.lightBlue.withOpacity(0.2)]
+                : [Colors.orange.withOpacity(0.2), Colors.amber.withOpacity(0.2)],
           ),
           borderRadius: BorderRadius.circular(Adapt.px(12)),
-          border: Border.all(color: Colors.orange.withOpacity(0.4)),
+          border: Border.all(
+              color: (_walletService.isTestnet ? Colors.blueAccent : Colors.orange)
+                  .withOpacity(0.4)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.water_drop, color: Colors.orange, size: 20),
+            Icon(Icons.water_drop,
+                color: _walletService.isTestnet ? Colors.blueAccent : Colors.orange,
+                size: 20),
             SizedBox(width: 8),
             Text(
-              'Request Devnet Airdrop (1 SOL)',
+              'Request ${_walletService.networkName} Airdrop (1 SOL)',
               style: TextStyle(
-                color: Colors.orange,
+                color: _walletService.isTestnet ? Colors.blueAccent : Colors.orange,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -722,8 +742,8 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     try {
       OXLoading.show();
       // Auto-switch to devnet for new wallets (development friendly)
-      if (!_walletService.isDevnet) {
-        await _walletService.switchNetwork(devnet: true);
+      if (_walletService.isMainnet) {
+        await _walletService.switchNetwork(network: SolanaNetwork.devnet);
       }
       await _walletService.createWallet();
       OXLoading.dismiss();
@@ -919,8 +939,13 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               ),
               SizedBox(height: 12),
               Text(
-                '🟠 You are on Devnet. Tap "Request Airdrop" to get free test SOL.',
-                style: TextStyle(color: Colors.orange, fontSize: 12),
+                _walletService.isTestnet
+                    ? '🔵 You are on Testnet. Tap "Request Airdrop" to get free test SOL.'
+                    : '🟠 You are on Devnet. Tap "Request Airdrop" to get free test SOL.',
+                style: TextStyle(
+                  color: _walletService.isTestnet ? Colors.blueAccent : Colors.orange,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -1601,12 +1626,46 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     );
   }
 
-  Future<void> _toggleNetwork() async {
-    final newDevnet = !_walletService.isDevnet;
-    await _walletService.switchNetwork(devnet: newDevnet);
-    if (mounted) {
-      CommonToast.instance
-          .show(context, 'Switched to ${newDevnet ? "Devnet" : "Mainnet"}');
-    }
+  Future<void> _showNetworkPicker() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThemeColor.color190,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Select Network',
+                style: TextStyle(color: ThemeColor.color0, fontSize: 16, fontWeight: FontWeight.bold)),
+            SizedBox(height: 12),
+            _buildNetworkTile(ctx, 'Mainnet', SolanaNetwork.mainnet, Colors.green),
+            _buildNetworkTile(ctx, 'Devnet', SolanaNetwork.devnet, Colors.orange),
+            _buildNetworkTile(ctx, 'Testnet', SolanaNetwork.testnet, Colors.blueAccent),
+            SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNetworkTile(BuildContext ctx, String label, SolanaNetwork network, Color color) {
+    final selected = _walletService.networkName == network.name;
+    return ListTile(
+      leading: Icon(selected ? Icons.check_circle : Icons.circle_outlined, color: color),
+      title: Text(label, style: TextStyle(color: ThemeColor.color0)),
+      trailing: selected ? Text('Current', style: TextStyle(color: color, fontSize: 12)) : null,
+      onTap: () async {
+        Navigator.pop(ctx);
+        await _walletService.switchNetwork(network: network);
+        if (mounted) {
+          CommonToast.instance.show(context, 'Switched to ${network.name}');
+        }
+      },
+    );
   }
 }
+

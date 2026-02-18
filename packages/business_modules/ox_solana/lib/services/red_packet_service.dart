@@ -75,7 +75,7 @@ class RedPacketService {
       senderNostrPubkey: senderNostrPubkey ?? '',
       createdAt: DateTime.now(),
       claims: [],
-      isDevnet: SolanaWalletService.instance.isDevnet,
+      isDevnet: !SolanaWalletService.instance.isMainnet,
     );
 
     // Pre-split amounts

@@ -507,6 +507,16 @@ extension ChatGestureHandlerEx on ChatGeneralHandler {
         });
         return;
       }
+
+      if (lower.startsWith('solana:tx:')) {
+        final signature = link.split('solana:tx:').last;
+        if (signature.isNotEmpty) {
+          OXModuleService.pushPage(context, 'ox_solana', 'TransactionHistoryPage', {
+            'highlightSignature': signature,
+          });
+          return;
+        }
+      }
     }
 
     // Default behavior

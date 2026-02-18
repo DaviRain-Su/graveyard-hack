@@ -209,7 +209,11 @@ class SolanaNft {
   String get shortMint => '${mint.substring(0, 4)}...${mint.substring(mint.length - 4)}';
 
   String get explorerUrl {
-    final cluster = SolanaWalletService.instance.isDevnet ? '?cluster=devnet' : '';
+    final cluster = SolanaWalletService.instance.isDevnet
+        ? '?cluster=devnet'
+        : SolanaWalletService.instance.isTestnet
+            ? '?cluster=testnet'
+            : '';
     return 'https://explorer.solana.com/address/$mint$cluster';
   }
 

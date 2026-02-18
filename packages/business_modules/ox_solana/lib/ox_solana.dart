@@ -94,7 +94,12 @@ class OXSolana extends OXFlutterModule {
       case 'ReceivePage':
         return OXNavigator.pushPage(context, (ctx) => const ReceivePage());
       case 'TransactionHistoryPage':
-        return OXNavigator.pushPage(context, (ctx) => const TransactionHistoryPage());
+        return OXNavigator.pushPage(
+          context,
+          (ctx) => TransactionHistoryPage(
+            highlightSignature: params?['highlightSignature'],
+          ),
+        );
       case 'SwapPage':
         return OXNavigator.pushPage(context, (ctx) => const SwapPage());
       case 'RedPacketPage':

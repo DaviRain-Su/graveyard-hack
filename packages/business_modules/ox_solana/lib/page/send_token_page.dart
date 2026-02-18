@@ -224,7 +224,7 @@ class _SendTokenPageState extends State<SendTokenPage> {
             SizedBox(height: 10),
             _confirmRow('Amount', '$amountStr ${widget.token.symbol}'),
             SizedBox(height: 10),
-            _confirmRow('Network', _walletService.isDevnet ? 'Devnet' : 'Mainnet'),
+            _confirmRow('Network', _walletService.networkName),
           ],
         ),
         actions: [

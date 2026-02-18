@@ -33,7 +33,7 @@ class JupiterService {
 
   /// Check if Jupiter swap is available (mainnet only)
   static bool isAvailable() {
-    return !SolanaWalletService.instance.isDevnet;
+    return SolanaWalletService.instance.isMainnet;
   }
 
   /// Get swap quote from Jupiter
@@ -43,7 +43,7 @@ class JupiterService {
     required int amount, // in smallest unit (lamports for SOL)
     int slippageBps = 50, // 0.5%
   }) async {
-    if (SolanaWalletService.instance.isDevnet) {
+    if (!SolanaWalletService.instance.isMainnet) {
       throw Exception('Jupiter swap is only available on mainnet. Switch to mainnet first.');
     }
 
