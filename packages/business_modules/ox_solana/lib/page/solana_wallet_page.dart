@@ -17,6 +17,7 @@ import 'swap_page.dart';
 import 'audius_page.dart';
 import 'nft_gallery_page.dart';
 import 'dapp_connect_page.dart';
+import 'tapestry_social_page.dart';
 
 /// Main Solana wallet page — shows balance, address, and action buttons
 class SolanaWalletPage extends StatefulWidget {
@@ -233,6 +234,8 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
           // ── Discover ──
           _buildSectionHeader('Discover', icon: Icons.explore_outlined),
           SizedBox(height: Adapt.px(8)),
+          _buildTapestrySocialShortcut(),
+          SizedBox(height: Adapt.px(10)),
           _buildNftShortcut(),
           SizedBox(height: Adapt.px(10)),
           _buildAudiusShortcut(),
@@ -508,9 +511,10 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
 
     try {
       OXLoading.show();
-      final profile = await TapestryService.instance.createProfile(
+      final profile = await TapestryService.instance.findOrCreateProfile(
+        walletAddress: _walletService.address,
+        username: 'nostr_${nostrPubkey.substring(0, 8)}',
         nostrPubkey: nostrPubkey,
-        solanaAddress: _walletService.address,
       );
       OXLoading.dismiss();
 
@@ -905,6 +909,53 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               ),
             ),
             Icon(Icons.copy, size: 16, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTapestrySocialShortcut() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TapestrySocialPage()),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF6366F1).withOpacity(0.15), Color(0xFFA855F7).withOpacity(0.1)],
+          ),
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: Color(0xFF6366F1).withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.hub, color: Colors.white, size: 20),
+            ),
+            SizedBox(width: Adapt.px(12)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tapestry Social',
+                      style: TextStyle(color: ThemeColor.color0, fontWeight: FontWeight.w600, fontSize: 15)),
+                  Text('On-chain social graph • Follow • Post • Like',
+                      style: TextStyle(color: ThemeColor.color100, fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ThemeColor.color100, size: 20),
           ],
         ),
       ),

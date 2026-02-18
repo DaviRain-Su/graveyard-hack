@@ -68,5 +68,10 @@
   "cancel": "취소",
   "network": "네트워크",
   "mainnet": "메인넷",
-  "devnet": "개발넷"
+  "devnet": "개발넷",
+  "tapestry_social": "Tapestry 소셜",
+  "tapestry_desc": "온체인 소셜 그래프",
+  "tapestry_follow": "팔로우",
+  "tapestry_following": "팔로잉",
+  "tapestry_followers": "팔로워"
 }

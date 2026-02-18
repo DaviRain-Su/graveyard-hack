@@ -31,5 +31,10 @@
   "cancel": "Cancelar",
   "network": "Red",
   "mainnet": "Red Principal",
-  "devnet": "Red de Desarrollo"
+  "devnet": "Red de Desarrollo",
+  "tapestry_social": "Tapestry Social",
+  "tapestry_desc": "Grafo social on-chain",
+  "tapestry_follow": "Seguir",
+  "tapestry_following": "Siguiendo",
+  "tapestry_followers": "Seguidores"
 }

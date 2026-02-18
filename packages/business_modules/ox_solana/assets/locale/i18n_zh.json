@@ -117,5 +117,19 @@
   "custom_rpc": "自定义 RPC",
   "network": "网络",
   "mainnet": "主网",
-  "devnet": "开发网"
+  "devnet": "开发网",
+  "tapestry_social": "Tapestry 社交",
+  "tapestry_desc": "链上社交图谱",
+  "tapestry_follow": "关注",
+  "tapestry_following": "正在关注",
+  "tapestry_followers": "粉丝",
+  "tapestry_discover": "发现",
+  "tapestry_feed": "动态",
+  "tapestry_post": "发布",
+  "tapestry_like": "点赞",
+  "tapestry_comment": "评论",
+  "tapestry_connect": "连接 Tapestry",
+  "tapestry_create_profile": "在 Tapestry 上创建档案",
+  "tapestry_edit_profile": "编辑档案",
+  "tapestry_search": "搜索 Tapestry 上的所有用户"
 }

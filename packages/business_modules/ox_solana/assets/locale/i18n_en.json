@@ -117,5 +117,19 @@
   "custom_rpc": "Custom RPC",
   "network": "Network",
   "mainnet": "Mainnet",
-  "devnet": "Devnet"
+  "devnet": "Devnet",
+  "tapestry_social": "Tapestry Social",
+  "tapestry_desc": "On-chain social graph",
+  "tapestry_follow": "Follow",
+  "tapestry_following": "Following",
+  "tapestry_followers": "Followers",
+  "tapestry_discover": "Discover",
+  "tapestry_feed": "Feed",
+  "tapestry_post": "Post",
+  "tapestry_like": "Like",
+  "tapestry_comment": "Comment",
+  "tapestry_connect": "Connect to Tapestry",
+  "tapestry_create_profile": "Create Profile on Tapestry",
+  "tapestry_edit_profile": "Edit Profile",
+  "tapestry_search": "Search users across all Tapestry apps"
 }
