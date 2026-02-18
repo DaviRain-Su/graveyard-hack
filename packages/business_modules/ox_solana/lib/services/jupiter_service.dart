@@ -8,12 +8,13 @@ import 'package:solana/encoder.dart';
 import 'solana_wallet_service.dart';
 
 /// Jupiter DEX aggregator service — swap tokens on Solana.
-/// API: https://quote-api.jup.ag/v6
+/// API: https://lite-api.jup.ag/swap/v1 (free public endpoint, mainnet only)
+/// Note: Jupiter only works on mainnet — no devnet support.
 class JupiterService {
   static final JupiterService instance = JupiterService._();
   JupiterService._();
 
-  static const String _baseUrl = 'https://quote-api.jup.ag/v6';
+  static const String _baseUrl = 'https://lite-api.jup.ag/swap/v1';
 
   // Well-known token mints
   static const String solMint = 'So11111111111111111111111111111111111111112';
@@ -30,6 +31,11 @@ class JupiterService {
     SwapToken(symbol: 'JUP', name: 'Jupiter', mint: jupMint, decimals: 6, logoChar: 'J'),
   ];
 
+  /// Check if Jupiter swap is available (mainnet only)
+  static bool isAvailable() {
+    return !SolanaWalletService.instance.isDevnet;
+  }
+
   /// Get swap quote from Jupiter
   Future<JupiterQuote?> getQuote({
     required String inputMint,
@@ -37,6 +43,10 @@ class JupiterService {
     required int amount, // in smallest unit (lamports for SOL)
     int slippageBps = 50, // 0.5%
   }) async {
+    if (SolanaWalletService.instance.isDevnet) {
+      throw Exception('Jupiter swap is only available on mainnet. Switch to mainnet first.');
+    }
+
     try {
       final uri = Uri.parse('$_baseUrl/quote').replace(queryParameters: {
         'inputMint': inputMint,
@@ -45,20 +55,33 @@ class JupiterService {
         'slippageBps': slippageBps.toString(),
       });
 
-      final response = await http.get(uri);
+      if (kDebugMode) print('[Jupiter] Quote URL: $uri');
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        if (kDebugMode) print('[Jupiter] Quote success: inAmount=${data['inAmount']} outAmount=${data['outAmount']}');
         return JupiterQuote.fromJson(data);
       } else {
         if (kDebugMode) {
           print('[Jupiter] Quote error: ${response.statusCode} ${response.body}');
         }
-        return null;
+        throw Exception('Quote failed (${response.statusCode}): ${_parseError(response.body)}');
       }
     } catch (e) {
       if (kDebugMode) print('[Jupiter] Quote exception: $e');
-      return null;
+      rethrow;
+    }
+  }
+
+  /// Parse error message from Jupiter API response
+  static String _parseError(String body) {
+    try {
+      final json = jsonDecode(body);
+      return json['error']?.toString() ?? json['message']?.toString() ?? body;
+    } catch (_) {
+      return body.length > 100 ? '${body.substring(0, 100)}...' : body;
     }
   }
 
@@ -78,7 +101,7 @@ class JupiterService {
           'dynamicComputeUnitLimit': true,
           'prioritizationFeeLamports': 'auto',
         }),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -87,11 +110,11 @@ class JupiterService {
         if (kDebugMode) {
           print('[Jupiter] Swap tx error: ${response.statusCode} ${response.body}');
         }
-        return null;
+        throw Exception('Swap transaction failed: ${_parseError(response.body)}');
       }
     } catch (e) {
       if (kDebugMode) print('[Jupiter] Swap tx exception: $e');
-      return null;
+      rethrow;
     }
   }
 

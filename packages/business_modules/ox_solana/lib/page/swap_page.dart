@@ -42,6 +42,31 @@ class _SwapPageState extends State<SwapPage> {
         padding: EdgeInsets.all(Adapt.px(16)),
         child: Column(
           children: [
+            // Devnet warning
+            if (SolanaWalletService.instance.isDevnet)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(12),
+                margin: EdgeInsets.only(bottom: Adapt.px(12)),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Jupiter swap is only available on Mainnet. Switch network to use swap.',
+                        style: TextStyle(color: Colors.orange, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Input token
             _buildTokenInput(
               label: 'You Pay',
@@ -458,22 +483,32 @@ class _SwapPageState extends State<SwapPage> {
       return;
     }
 
-    setState(() => _isQuoting = true);
-
-    final rawAmount = (amount * math.pow(10, _inputToken.decimals)).toInt();
-    final quote = await JupiterService.instance.getQuote(
-      inputMint: _inputToken.mint,
-      outputMint: _outputToken.mint,
-      amount: rawAmount,
-    );
-
     setState(() {
-      _isQuoting = false;
-      _quote = quote;
+      _isQuoting = true;
+      _quote = null;
     });
 
-    if (quote == null && mounted) {
-      CommonToast.instance.show(context, 'No route found');
+    try {
+      final rawAmount = (amount * math.pow(10, _inputToken.decimals)).toInt();
+      final quote = await JupiterService.instance.getQuote(
+        inputMint: _inputToken.mint,
+        outputMint: _outputToken.mint,
+        amount: rawAmount,
+      );
+
+      setState(() {
+        _isQuoting = false;
+        _quote = quote;
+      });
+
+      if (quote == null && mounted) {
+        CommonToast.instance.show(context, 'No route found for this pair');
+      }
+    } catch (e) {
+      setState(() => _isQuoting = false);
+      if (mounted) {
+        CommonToast.instance.show(context, '$e');
+      }
     }
   }
 
