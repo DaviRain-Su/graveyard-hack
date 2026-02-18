@@ -14,6 +14,7 @@ import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_image_gallery.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_localizable/ox_localizable.dart';
+import 'package:ox_module_service/ox_module_service.dart';
 import 'package:photo_view/photo_view.dart' show PhotoViewComputedScale;
 
 class ChatPageConfig {
@@ -53,6 +54,8 @@ class ChatPageConfig {
     final otherUser = handler.otherUser;
     if (handler.session.chatType == ChatType.chatSingle && otherUser != null) {
       items.add(InputMoreItemEx.zaps(handler, otherUser));
+      // Send SOL — Solana wallet integration
+      items.add(InputMoreItemEx.sendSol(handler, otherUser));
       if(isMobile){
         items.add(InputMoreItemEx.call(handler, otherUser));
       }
@@ -150,6 +153,61 @@ extension InputMoreItemEx on InputMoreItem {
         iconName: 'chat_ecash_icon.png',
         action: (context) {
           handler.ecashPressHandler(context);
+        },
+      );
+
+  /// Send SOL via Solana wallet — cross-module call to ox_solana
+  static InputMoreItem sendSol(ChatGeneralHandler handler, UserDBISAR? otherUser) =>
+      InputMoreItem(
+        id: 'sendSol',
+        title: () => 'SOL',
+        iconName: 'chat_sol_icon.png',
+        action: (context) {
+          final user = otherUser;
+          if (user == null) {
+            ChatLogUtils.error(className: 'ChatPageConfig', funcName: 'sendSol', message: 'user is null');
+            CommonToast.instance.show(context, 'User info not found');
+            return;
+          }
+
+          // Check if ox_solana module has wallet
+          final hasSolanaWallet = OXModuleService.invoke('ox_solana', 'hasSolanaWallet', []);
+          if (hasSolanaWallet != true) {
+            // No wallet — prompt to create one
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: ThemeColor.color180,
+                title: Text('Solana Wallet Required', style: TextStyle(color: ThemeColor.color0)),
+                content: Text(
+                  'You need a Solana wallet to send SOL. Go to Me → Solana Wallet to create one.',
+                  style: TextStyle(color: ThemeColor.color100),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      OXModuleService.pushPage(context, 'ox_solana', 'SolanaWalletPage', {});
+                    },
+                    child: Text('Go to Wallet', style: TextStyle(color: Color(0xFF9945FF), fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          // Call ox_solana's showSendSolDialog via module interface
+          OXModuleService.invoke('ox_solana', 'showSendSolDialog', [
+            context,
+          ], {
+            #recipientNostrPubkey: user.pubKey,
+            #recipientName: user.name ?? user.pubKey.substring(0, 8),
+          });
         },
       );
 

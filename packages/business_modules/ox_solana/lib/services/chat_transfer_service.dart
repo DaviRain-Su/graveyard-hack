@@ -136,12 +136,23 @@ class ChatTransferService {
       if (recipientSolAddress == null) {
         OXLoading.dismiss();
         if (context.mounted) {
-          CommonToast.instance.show(
+          // Offer to enter address manually
+          final manualAddress = await _showManualAddressDialog(
             context,
-            'Recipient has no linked Solana wallet. Ask them to set up in Me → Solana Wallet.',
+            recipientName: recipientName,
           );
+          if (manualAddress == null || manualAddress.isEmpty) return;
+          recipientSolAddress = manualAddress;
+
+          // Cache this binding for future transfers
+          await TapestryService.instance.bindLocal(
+            nostrPubkey: recipientNostrPubkey,
+            solanaAddress: recipientSolAddress,
+          );
+          OXLoading.show();
+        } else {
+          return;
         }
-        return;
       }
 
       // 2. Send SOL
@@ -215,6 +226,66 @@ class ChatTransferService {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Show dialog to enter recipient's Solana address manually
+  static Future<String?> _showManualAddressDialog(
+    BuildContext context, {
+    String? recipientName,
+  }) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text(
+          'Enter Solana Address',
+          style: TextStyle(color: ThemeColor.color0),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${recipientName ?? "This contact"} hasn\'t linked a Solana wallet yet.\n\nPaste their Solana address to send directly:',
+              style: TextStyle(color: ThemeColor.color100, fontSize: 13),
+            ),
+            SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: TextStyle(color: ThemeColor.color0, fontSize: 13, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                hintText: 'Solana address...',
+                hintStyle: TextStyle(color: ThemeColor.color110),
+                filled: true,
+                fillColor: ThemeColor.color190,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          TextButton(
+            onPressed: () {
+              final addr = controller.text.trim();
+              if (SolanaWalletService.isValidSolanaAddress(addr)) {
+                Navigator.pop(ctx, addr);
+              } else {
+                CommonToast.instance.show(context, 'Invalid Solana address');
+              }
+            },
+            child: Text('Confirm', style: TextStyle(color: Color(0xFF9945FF), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   static String _shortPubkey(String pubkey) {

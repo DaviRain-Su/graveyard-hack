@@ -6,6 +6,7 @@ import 'package:ox_common/widgets/common_toast.dart';
 
 import '../models/spl_token_info.dart';
 import '../services/solana_wallet_service.dart';
+import '../services/price_service.dart';
 import '../page/send_token_page.dart';
 
 /// Token list widget — displays SPL token holdings
@@ -170,7 +171,7 @@ class TokenListWidget extends StatelessWidget {
                   ),
                 ),
 
-                // Balance
+                // Balance + USD value
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -184,14 +185,20 @@ class TokenListWidget extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 2),
-                    Text(
-                      token.shortMint,
-                      style: TextStyle(
-                        color: ThemeColor.color110,
-                        fontSize: 10,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
+                    Builder(builder: (_) {
+                      final usdVal = PriceService.instance.formatUsdValue(
+                        token.uiAmount,
+                        token.mintAddress,
+                      );
+                      return Text(
+                        usdVal.isNotEmpty ? usdVal : token.shortMint,
+                        style: TextStyle(
+                          color: usdVal.isNotEmpty ? ThemeColor.color100 : ThemeColor.color110,
+                          fontSize: usdVal.isNotEmpty ? 12 : 10,
+                          fontFamily: 'monospace',
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ],

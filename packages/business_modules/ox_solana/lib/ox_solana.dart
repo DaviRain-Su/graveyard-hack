@@ -6,6 +6,7 @@ import 'package:ox_module_service/ox_module_service.dart';
 
 import 'services/solana_wallet_service.dart';
 import 'services/tapestry_service.dart';
+import 'services/price_service.dart';
 import 'page/solana_wallet_page.dart';
 import 'page/send_sol_page.dart';
 import 'page/receive_page.dart';
@@ -26,6 +27,8 @@ class OXSolana extends OXFlutterModule {
     await super.setup();
     await SolanaWalletService.instance.init();
     await TapestryService.instance.init();
+    // Pre-fetch token prices (non-blocking)
+    PriceService.instance.fetchPrices();
   }
 
   @override

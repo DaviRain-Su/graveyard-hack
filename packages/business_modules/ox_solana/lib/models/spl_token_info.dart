@@ -18,6 +18,9 @@ class SplTokenInfo {
     this.logoUrl,
   });
 
+  /// UI-friendly amount (same as balance, already divided by decimals)
+  double get uiAmount => balance;
+
   String get shortMint =>
       '${mintAddress.substring(0, 6)}...${mintAddress.substring(mintAddress.length - 4)}';
 

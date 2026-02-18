@@ -8,6 +8,7 @@ import 'package:ox_common/widgets/common_loading.dart';
 
 import '../services/solana_wallet_service.dart';
 import '../services/tapestry_service.dart';
+import '../services/price_service.dart';
 import '../widgets/token_list_widget.dart';
 import 'send_sol_page.dart';
 import 'receive_page.dart';
@@ -32,6 +33,8 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     if (_walletService.hasWallet) {
       _walletService.refreshBalance();
       _walletService.fetchTokens();
+      // Fetch prices in background (non-blocking)
+      PriceService.instance.fetchPrices();
     }
   }
 
@@ -259,13 +262,25 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                   width: 36,
                   child: CircularProgressIndicator(
                       color: Colors.white, strokeWidth: 2))
-              : Text(
-                  '${_walletService.balance.toStringAsFixed(4)} SOL',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_walletService.balance.toStringAsFixed(4)} SOL',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (PriceService.instance.solPrice > 0 && !_walletService.isDevnet) ...[
+                      SizedBox(height: 4),
+                      Text(
+                        '≈ ${PriceService.instance.formatUsdValue(_walletService.balance, 'So11111111111111111111111111111111111111112')}',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                    ],
+                  ],
                 ),
           if (_walletService.error != null) ...[
             SizedBox(height: 8),
@@ -362,7 +377,9 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Nostr ↔ Solana linked via Tapestry',
+                    tapestry.hasApiKey
+                        ? 'Nostr ↔ Solana linked via Tapestry'
+                        : 'Nostr ↔ Solana linked (local)',
                     style: TextStyle(color: ThemeColor.color0, fontSize: 14),
                   ),
                 ),
@@ -373,6 +390,13 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               Text(
                 'Profile: ${tapestry.profile!.username}',
                 style: TextStyle(color: ThemeColor.color100, fontSize: 12),
+              ),
+            ],
+            if (!tapestry.hasApiKey) ...[
+              SizedBox(height: 4),
+              Text(
+                'Add Tapestry API key in settings to sync on-chain',
+                style: TextStyle(color: ThemeColor.color110, fontSize: 11),
               ),
             ],
           ] else ...[
@@ -425,10 +449,13 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
 
       if (mounted) {
         if (profile != null) {
-          CommonToast.instance.show(context, 'Identity linked! ✅');
+          final msg = profile.isLocal
+              ? 'Identity linked locally! ✅'
+              : 'Identity linked on-chain! ✅';
+          CommonToast.instance.show(context, msg);
           setState(() {});
         } else {
-          CommonToast.instance.show(context, 'Binding failed — check API key');
+          CommonToast.instance.show(context, 'Binding failed');
         }
       }
     } catch (e) {
