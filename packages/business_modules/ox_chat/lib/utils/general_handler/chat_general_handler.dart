@@ -460,7 +460,56 @@ extension ChatGestureHandlerEx on ChatGeneralHandler {
   }
 
   void templateMessagePressHandler(BuildContext context, types.CustomMessage message) {
+    final title = TemplateMessageEx(message).title;
+    final content = TemplateMessageEx(message).content;
     final link = TemplateMessageEx(message).link;
+
+    // ── In-app deep links for Solana cards ──
+    if (link.isNotEmpty) {
+      final lower = link.toLowerCase();
+      if (lower.contains('audius.co') || title.startsWith('🎵')) {
+        final cleanTitle = title.replaceFirst('🎵', '').trim();
+        final artist = content.replaceFirst('by', '').trim();
+        OXModuleService.pushPage(context, 'ox_solana', 'AudiusPage', {
+          'autoPlayTitle': cleanTitle,
+          'autoPlayArtist': artist,
+          'autoPlay': true,
+        });
+        return;
+      }
+
+      if (lower.contains('explorer.solana.com/address') || title.startsWith('🖼️')) {
+        String? mint;
+        try {
+          final uri = Uri.parse(link);
+          if (uri.pathSegments.isNotEmpty) {
+            mint = uri.pathSegments.last;
+          }
+        } catch (_) {}
+        if (mint != null && mint.isNotEmpty) {
+          OXModuleService.pushPage(context, 'ox_solana', 'NftGalleryPage', {
+            'mint': mint,
+          });
+          return;
+        }
+      }
+
+      if (lower.contains('kydlabs.com') || title.startsWith('🎫')) {
+        String? eventId;
+        try {
+          final uri = Uri.parse(link);
+          if (uri.pathSegments.isNotEmpty) {
+            eventId = uri.pathSegments.last;
+          }
+        } catch (_) {}
+        OXModuleService.pushPage(context, 'ox_solana', 'KydEventsPage', {
+          if (eventId != null) 'eventId': eventId,
+        });
+        return;
+      }
+    }
+
+    // Default behavior
     if (link.isRemoteURL) {
       OXModuleService.invoke('ox_common', 'gotoWebView', [context, link, null, null, null, null]);
     } else {

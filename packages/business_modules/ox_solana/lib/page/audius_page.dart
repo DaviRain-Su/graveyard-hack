@@ -14,8 +14,17 @@ import '../services/audius_player_service.dart';
 /// Audius music page — browse, search, and **play** decentralized music
 class AudiusPage extends StatefulWidget {
   final Function(AudiusTrack track)? onTrackSelected;
+  final String? autoPlayTitle;
+  final String? autoPlayArtist;
+  final bool autoPlay;
 
-  const AudiusPage({super.key, this.onTrackSelected});
+  const AudiusPage({
+    super.key,
+    this.onTrackSelected,
+    this.autoPlayTitle,
+    this.autoPlayArtist,
+    this.autoPlay = false,
+  });
 
   @override
   State<AudiusPage> createState() => _AudiusPageState();
@@ -44,6 +53,12 @@ class _AudiusPageState extends State<AudiusPage> {
     super.initState();
     _loadTrending();
     _playerService.addListener(_onPlayerChanged);
+
+    if (widget.autoPlay && widget.autoPlayTitle != null) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _openSharedTrack(widget.autoPlayTitle!, widget.autoPlayArtist);
+      });
+    }
   }
 
   void _onPlayerChanged() {
@@ -203,6 +218,37 @@ class _AudiusPageState extends State<AudiusPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _openSharedTrack(String title, String? artist) async {
+    if (title.trim().isEmpty) return;
+    _searchController.text = title;
+    setState(() {
+      _isSearching = true;
+      _currentTab = 'search';
+    });
+
+    final results = await AudiusService.instance.searchTracks(title, limit: 10);
+    AudiusTrack? match;
+    if (results.isNotEmpty) {
+      if (artist != null && artist.trim().isNotEmpty) {
+        match = results.firstWhere(
+          (t) => t.artistName.toLowerCase().contains(artist.toLowerCase()),
+          orElse: () => results.first,
+        );
+      } else {
+        match = results.first;
+      }
+    }
+
+    setState(() {
+      _tracks = results;
+      _isSearching = false;
+    });
+
+    if (match != null) {
+      _playTrack(match);
+    }
   }
 
   Widget _buildGenreChip(String label, String? genre) {

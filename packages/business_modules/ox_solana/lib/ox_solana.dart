@@ -122,11 +122,15 @@ class OXSolana extends OXFlutterModule {
             context,
             (ctx) => AudiusPage(
                   onTrackSelected: typedCallback,
+                  autoPlayTitle: params?['autoPlayTitle'],
+                  autoPlayArtist: params?['autoPlayArtist'],
+                  autoPlay: params?['autoPlay'] == true,
                 ));
       case 'NftGalleryPage':
         return OXNavigator.pushPage(context, (ctx) => NftGalleryPage(
           pickerMode: params?['pickerMode'] ?? false,
           onNftSelected: params?['onNftSelected'],
+          focusMint: params?['mint'],
         ));
       case 'DappConnectPage':
         return OXNavigator.pushPage(context, (ctx) => const DappConnectPage());
@@ -150,7 +154,9 @@ class OXSolana extends OXFlutterModule {
             ),
           );
         }
-        return OXNavigator.pushPage(context, (ctx) => const KydEventsPage());
+        return OXNavigator.pushPage(context, (ctx) => KydEventsPage(
+          eventId: params?['eventId'],
+        ));
     }
     return null;
   }

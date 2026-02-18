@@ -11,8 +11,14 @@ import '../services/nft_service.dart';
 class NftGalleryPage extends StatefulWidget {
   final Function(Map<String, dynamic>)? onNftSelected;
   final bool pickerMode;
+  final String? focusMint;
 
-  const NftGalleryPage({super.key, this.onNftSelected, this.pickerMode = false});
+  const NftGalleryPage({
+    super.key,
+    this.onNftSelected,
+    this.pickerMode = false,
+    this.focusMint,
+  });
 
   @override
   State<NftGalleryPage> createState() => _NftGalleryPageState();
@@ -26,6 +32,7 @@ class _NftGalleryPageState extends State<NftGalleryPage> with SingleTickerProvid
   String? _error;
   late TabController _tabController;
   int _currentTab = 0;
+  bool _openedFocusMint = false;
 
   @override
   void initState() {
@@ -56,6 +63,19 @@ class _NftGalleryPageState extends State<NftGalleryPage> with SingleTickerProvid
       _error = '$e';
     }
     if (mounted) setState(() => _isLoading = false);
+
+    if (!_openedFocusMint && widget.focusMint != null && widget.focusMint!.isNotEmpty) {
+      _openedFocusMint = true;
+      if (_nfts.isNotEmpty) {
+        final match = _nfts.firstWhere(
+          (n) => n.mint == widget.focusMint,
+          orElse: () => _nfts.first,
+        );
+        if (match.mint == widget.focusMint) {
+          Future.delayed(const Duration(milliseconds: 200), () => _showNftDetail(match));
+        }
+      }
+    }
   }
 
   Future<void> _loadDripDrops() async {

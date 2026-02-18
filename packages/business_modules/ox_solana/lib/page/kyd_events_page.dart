@@ -10,8 +10,10 @@ import '../services/kyd_service.dart';
 class KydEventsPage extends StatefulWidget {
   /// Optional: if set, the page is in "share picker" mode for chat
   final Function(KydEvent event)? onEventSelected;
+  /// Optional: open event detail directly
+  final String? eventId;
 
-  const KydEventsPage({Key? key, this.onEventSelected}) : super(key: key);
+  const KydEventsPage({Key? key, this.onEventSelected, this.eventId}) : super(key: key);
 
   @override
   State<KydEventsPage> createState() => _KydEventsPageState();
@@ -27,6 +29,11 @@ class _KydEventsPageState extends State<KydEventsPage> {
   void initState() {
     super.initState();
     _loadEvents();
+    if (widget.eventId != null) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        _openEventById(widget.eventId!);
+      });
+    }
   }
 
   Future<void> _loadEvents({bool force = false}) async {
@@ -47,6 +54,21 @@ class _KydEventsPageState extends State<KydEventsPage> {
     OXLoading.show();
     try {
       final detail = await KydService.instance.getEventDetail(event.id);
+      OXLoading.dismiss();
+      if (detail != null && mounted) {
+        setState(() => _selectedEvent = detail);
+      }
+    } catch (e) {
+      OXLoading.dismiss();
+      if (mounted) CommonToast.instance.show(context, 'Failed to load: $e');
+    }
+  }
+
+  Future<void> _openEventById(String eventId) async {
+    if (eventId.isEmpty) return;
+    OXLoading.show();
+    try {
+      final detail = await KydService.instance.getEventDetail(eventId);
       OXLoading.dismiss();
       if (detail != null && mounted) {
         setState(() => _selectedEvent = detail);
