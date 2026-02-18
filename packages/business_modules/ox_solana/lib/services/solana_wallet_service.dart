@@ -58,6 +58,45 @@ class SolanaWalletService extends ChangeNotifier {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
   );
 
+  // --- Secure storage with macOS Keychain fallback ---
+  // macOS debug builds without signing can't use Keychain (-34018).
+  // Fallback to SharedPreferences with prefix to keep it distinguishable.
+  static const String _fallbackPrefix = '_sec_fb_';
+
+  Future<void> _secureWrite(String key, String value) async {
+    try {
+      await _secureStorage.write(key: key, value: value);
+    } catch (e) {
+      if (kDebugMode) print('[OXSolana] SecureStorage write failed ($e), using SharedPreferences fallback');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_fallbackPrefix$key', value);
+    }
+  }
+
+  Future<String?> _secureRead(String key) async {
+    try {
+      final val = await _secureStorage.read(key: key);
+      if (val != null) return val;
+    } catch (e) {
+      if (kDebugMode) print('[OXSolana] SecureStorage read failed ($e), trying SharedPreferences fallback');
+    }
+    // Fallback: check SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('$_fallbackPrefix$key') ?? prefs.getString(key);
+  }
+
+  Future<void> _secureDelete(String key) async {
+    try {
+      await _secureStorage.delete(key: key);
+    } catch (e) {
+      if (kDebugMode) print('[OXSolana] SecureStorage delete failed ($e)');
+    }
+    // Also clear fallback
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_fallbackPrefix$key');
+    await prefs.remove(key);
+  }
+
   String? _mnemonic;
   /// Whether wallet was created from mnemonic (can be backed up)
   bool get hasMnemonic => _mnemonic != null;
@@ -268,13 +307,9 @@ class SolanaWalletService extends ChangeNotifier {
     _balance = 0;
     _tokens = [];
     _history = [];
-    // Clear from secure storage
-    await _secureStorage.delete(key: _keyStorageKey);
-    await _secureStorage.delete(key: _mnemonicStorageKey);
-    // Also clear any legacy SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyStorageKey);
-    await prefs.remove(_mnemonicStorageKey);
+    // Clear from all storage layers
+    await _secureDelete(_keyStorageKey);
+    await _secureDelete(_mnemonicStorageKey);
     notifyListeners();
   }
 
@@ -565,22 +600,14 @@ class SolanaWalletService extends ChangeNotifier {
     if (_keyPair == null) return;
 
     // Private key → SecureStorage (Keychain on iOS/macOS, Keystore on Android)
+    // Falls back to SharedPreferences on macOS debug builds without signing
     final keyBytes = await _keyPair!.extract();
     final encoded = base64Encode(keyBytes.bytes);
-    await _secureStorage.write(key: _keyStorageKey, value: encoded);
+    await _secureWrite(_keyStorageKey, encoded);
 
     // Mnemonic → SecureStorage
     if (_mnemonic != null) {
-      await _secureStorage.write(key: _mnemonicStorageKey, value: _mnemonic!);
-    }
-
-    // Migrate: clean up old SharedPreferences keys if they exist
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey(_keyStorageKey)) {
-      await prefs.remove(_keyStorageKey);
-    }
-    if (prefs.containsKey(_mnemonicStorageKey)) {
-      await prefs.remove(_mnemonicStorageKey);
+      await _secureWrite(_mnemonicStorageKey, _mnemonic!);
     }
   }
 
@@ -589,28 +616,9 @@ class SolanaWalletService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _isDevnet = prefs.getBool(_networkKey) ?? false;
 
-      // Load from SecureStorage first, fallback to SharedPreferences (migration)
-      String? encoded = await _secureStorage.read(key: _keyStorageKey);
-      _mnemonic = await _secureStorage.read(key: _mnemonicStorageKey);
-
-      // Migration: move old SharedPreferences data to SecureStorage
-      if (encoded == null && prefs.containsKey(_keyStorageKey)) {
-        encoded = prefs.getString(_keyStorageKey);
-        _mnemonic ??= prefs.getString(_mnemonicStorageKey);
-        if (encoded != null) {
-          // Re-save to secure storage
-          await _secureStorage.write(key: _keyStorageKey, value: encoded);
-          if (_mnemonic != null) {
-            await _secureStorage.write(key: _mnemonicStorageKey, value: _mnemonic!);
-          }
-          // Remove from SharedPreferences
-          await prefs.remove(_keyStorageKey);
-          await prefs.remove(_mnemonicStorageKey);
-          if (kDebugMode) {
-            print('[OXSolana] Migrated keys from SharedPreferences to SecureStorage');
-          }
-        }
-      }
+      // Load from SecureStorage (or fallback)
+      String? encoded = await _secureRead(_keyStorageKey);
+      _mnemonic = await _secureRead(_mnemonicStorageKey);
 
       if (encoded == null) return;
 
