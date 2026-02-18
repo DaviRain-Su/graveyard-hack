@@ -6,9 +6,11 @@ import 'package:ox_common/widgets/common_appbar.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_common/widgets/common_loading.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ox_module_service/ox_module_service.dart';
 
 import '../services/solana_wallet_service.dart';
 import '../services/tapestry_service.dart';
+import 'demo_checklist_page.dart';
 import '../services/price_service.dart';
 import '../widgets/token_list_widget.dart';
 import 'send_sol_page.dart';
@@ -63,6 +65,14 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         title: 'Solana Wallet',
         backgroundColor: ThemeColor.color190,
         actions: [
+          IconButton(
+            icon: Icon(Icons.list_alt, color: ThemeColor.color0),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DemoChecklistPage()),
+            ),
+            tooltip: 'Demo Checklist',
+          ),
           IconButton(
             icon: Icon(
               _walletService.isMainnet ? Icons.public : Icons.bug_report,
@@ -952,6 +962,19 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                   launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
                 },
                 child: Text('Explorer', style: TextStyle(color: Color(0xFF9945FF))),
+              ),
+              TextButton(
+                onPressed: () {
+                  final url = _walletService.getExplorerUrl(sig);
+                  final msg = '✅ Proof Tx (${_walletService.networkName})\n'
+                      'Amount: $amount SOL\n'
+                      'Signature: $sig\n'
+                      '$url';
+                  OXModuleService.pushPage(context, 'ox_chat', 'ChatChooseSharePage', {
+                    'url': msg,
+                  });
+                },
+                child: Text('Share', style: TextStyle(color: Color(0xFF14F195))),
               ),
             ],
           ),
