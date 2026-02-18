@@ -24,6 +24,7 @@ dependencies:
 
   # Solana SDK
   solana: ^0.32.0
+  crypto: ^3.0.0
 
   # QR code
   qr_flutter: ^4.1.0

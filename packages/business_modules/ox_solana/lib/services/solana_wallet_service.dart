@@ -6,6 +6,7 @@ import 'package:solana/solana.dart';
 import 'package:solana/dto.dart' hide Account;
 import 'package:solana/src/rpc/dto/transaction.dart' as sol_tx;
 import 'package:bip39/bip39.dart' as bip39;
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:ox_common/utils/storage_key_tool.dart';
 import 'package:chatcore/chat-core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +27,11 @@ class SolanaWalletService extends ChangeNotifier {
   String get address => _keyPair?.address ?? '';
   String? get publicKey => _keyPair?.address;
   bool get hasWallet => _keyPair != null;
+
+  /// Whether wallet was derived from the 0xchat Nostr account
+  bool _derivedFromNostr = false;
+  bool get isDerivedFromNostr => _derivedFromNostr;
+  static const String _derivedFromNostrKey = 'ox_solana_derived_from_nostr';
 
   /// Expose key pair for transaction signing (used by Jupiter swap)
   Ed25519HDKeyPair? get keyPair => _keyPair;
@@ -248,6 +254,96 @@ class SolanaWalletService extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Derive Solana wallet from 0xchat's Nostr private key.
+  ///
+  /// Nostr uses secp256k1 (32-byte private key).
+  /// Solana uses Ed25519 (64-byte expanded keypair = 32-byte seed + 32-byte pubkey).
+  ///
+  /// We derive the Ed25519 seed via:
+  ///   SHA-512("0xchat-solana-derive:" + nostrPrivkeyHex) → take first 32 bytes as Ed25519 seed
+  ///
+  /// This is the same pattern as Cashu NUT-13 (deterministic secrets from seed),
+  /// and similar to how Phantom/Solflare derive from BIP39 mnemonics.
+  ///
+  /// The derivation is deterministic: same Nostr key → same Solana address, always.
+  Future<String> deriveFromNostrKey() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final nostrPrivkey = Account.sharedInstance.currentPrivkey;
+      final nostrPubkey = Account.sharedInstance.currentPubkey;
+
+      if (nostrPrivkey.isEmpty || nostrPubkey.isEmpty) {
+        throw Exception('No Nostr account logged in. Please login to 0xchat first.');
+      }
+
+      // Check if using external signer (Amber etc) — can't derive from that
+      if (nostrPrivkey.length != 64) {
+        throw Exception('Cannot derive: Nostr key is managed by external signer');
+      }
+
+      // Derive Ed25519 seed from Nostr private key (deterministic)
+      // Domain separation: "0xchat-solana-derive:" prevents collision with other uses
+      final domainSeparator = 'oxchat-solana-derive:';
+      final input = Uint8List.fromList(
+        utf8.encode(domainSeparator) + _hexToBytes(nostrPrivkey),
+      );
+      final hash = crypto.sha512.convert(input);
+      final ed25519Seed = Uint8List.fromList(hash.bytes.sublist(0, 32)); // First 32 bytes as Ed25519 seed
+
+      // Create Ed25519 keypair from seed
+      _keyPair = await Ed25519HDKeyPair.fromSeedWithHdPath(
+        seed: ed25519Seed,
+        hdPath: "m/44'/501'/0'/0'", // Standard Solana BIP44 path
+      );
+
+      _mnemonic = null; // No mnemonic — derived from Nostr key
+      _derivedFromNostr = true;
+
+      // Save wallet + mark as nostr-derived
+      await _saveWallet();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_derivedFromNostrKey, true);
+
+      await refreshBalance(includeTokens: false);
+
+      if (kDebugMode) {
+        print('[OXSolana] Derived from Nostr key:');
+        print('  Nostr pubkey: ${nostrPubkey.substring(0, 8)}...');
+        print('  Solana address: $address');
+      }
+
+      return address;
+    } catch (e) {
+      _error = 'Failed to derive Solana wallet: $e';
+      if (kDebugMode) print('[OXSolana] $_error');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Check if the current Nostr account has a Nostr-derived Solana wallet
+  bool get canDeriveFromNostr {
+    final privkey = Account.sharedInstance.currentPrivkey;
+    return privkey.isNotEmpty && privkey.length == 64;
+  }
+
+  /// Get the Nostr public key (for display)
+  String get nostrPubkey => Account.sharedInstance.currentPubkey;
+
+  /// Helper: hex string to bytes
+  static Uint8List _hexToBytes(String hex) {
+    final result = Uint8List(hex.length ~/ 2);
+    for (var i = 0; i < hex.length; i += 2) {
+      result[i ~/ 2] = int.parse(hex.substring(i, i + 2), radix: 16);
+    }
+    return result;
   }
 
   /// Refresh SOL balance and SPL token list
@@ -612,14 +708,7 @@ class SolanaWalletService extends ChangeNotifier {
     return 'https://explorer.solana.com/address/$address$cluster';
   }
 
-  /// Get Nostr pubkey (for Tapestry binding)
-  String? get nostrPubkey {
-    try {
-      return Account.sharedInstance.currentPubkey;
-    } catch (_) {
-      return null;
-    }
-  }
+  // nostrPubkey getter defined above (near canDeriveFromNostr)
 
   // --- Private helpers ---
 
@@ -642,12 +731,23 @@ class SolanaWalletService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDevnet = prefs.getBool(_networkKey) ?? false;
+      _derivedFromNostr = prefs.getBool(_derivedFromNostrKey) ?? false;
 
       // Load from SecureStorage (or fallback)
       String? encoded = await _secureRead(_keyStorageKey);
       _mnemonic = await _secureRead(_mnemonicStorageKey);
 
-      if (encoded == null) return;
+      if (encoded == null) {
+        // No saved wallet — try auto-derive from Nostr key if user is logged in
+        if (canDeriveFromNostr) {
+          if (kDebugMode) {
+            print('[OXSolana] No saved wallet, auto-deriving from Nostr key...');
+          }
+          await deriveFromNostrKey();
+          return;
+        }
+        return;
+      }
 
       final keyBytes = base64Decode(encoded);
       _keyPair = await Ed25519HDKeyPair.fromPrivateKeyBytes(
@@ -655,7 +755,7 @@ class SolanaWalletService extends ChangeNotifier {
       );
 
       if (kDebugMode) {
-        print('[OXSolana] Wallet loaded: $address (mnemonic: ${_mnemonic != null ? "yes" : "no"}, secure: ✅)');
+        print('[OXSolana] Wallet loaded: $address (nostr-derived: $_derivedFromNostr, mnemonic: ${_mnemonic != null ? "yes" : "no"}, secure: ✅)');
       }
 
       await refreshBalance();

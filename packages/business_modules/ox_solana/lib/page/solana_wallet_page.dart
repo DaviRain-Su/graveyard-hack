@@ -114,6 +114,37 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               textAlign: TextAlign.center,
             ),
             SizedBox(height: Adapt.px(40)),
+            // PRIMARY: Derive from 0xchat Nostr key (recommended)
+            if (_walletService.canDeriveFromNostr) ...[
+              _buildButton(
+                label: 'Use 0xchat Account',
+                icon: Icons.link,
+                color: const Color(0xFF14F195),
+                textColor: Colors.black,
+                onTap: _deriveFromNostr,
+              ),
+              SizedBox(height: Adapt.px(8)),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  '⚡ Recommended — derives a Solana wallet from your 0xchat identity. Same account, same key.',
+                  style: TextStyle(fontSize: 11, color: ThemeColor.color110, height: 1.3),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(height: Adapt.px(20)),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: ThemeColor.color160)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('or', style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+                  ),
+                  Expanded(child: Divider(color: ThemeColor.color160)),
+                ],
+              ),
+              SizedBox(height: Adapt.px(20)),
+            ],
             _buildButton(
               label: 'Create New Wallet',
               icon: Icons.add,
@@ -382,8 +413,24 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Wallet Address',
-              style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+          Row(
+            children: [
+              Text('Wallet Address',
+                  style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+              if (_walletService.isDerivedFromNostr) ...[
+                SizedBox(width: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF14F195).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text('🔗 Nostr',
+                      style: TextStyle(color: Color(0xFF14F195), fontSize: 10, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ],
+          ),
           SizedBox(height: 8),
           GestureDetector(
             onTap: () {
@@ -600,13 +647,15 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    Color? textColor,
   }) {
+    final fgColor = textColor ?? Colors.white;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, color: Colors.white),
-        label: Text(label, style: const TextStyle(color: Colors.white)),
+        icon: Icon(icon, color: fgColor),
+        label: Text(label, style: TextStyle(color: fgColor, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           padding: EdgeInsets.symmetric(vertical: Adapt.px(14)),
@@ -680,6 +729,96 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
       OXLoading.dismiss();
       if (mounted) {
         _showWalletCreatedDialog();
+      }
+    } catch (e) {
+      OXLoading.dismiss();
+      if (mounted) {
+        CommonToast.instance.show(context, 'Failed: $e');
+      }
+    }
+  }
+
+  Future<void> _deriveFromNostr() async {
+    try {
+      OXLoading.show();
+      await _walletService.deriveFromNostrKey();
+      OXLoading.dismiss();
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: ThemeColor.color180,
+            title: Row(
+              children: [
+                Icon(Icons.link, color: Color(0xFF14F195), size: 28),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Wallet Linked!',
+                      style: TextStyle(color: ThemeColor.color0)),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Solana wallet has been derived from your 0xchat Nostr identity.',
+                  style: TextStyle(color: ThemeColor.color100, fontSize: 14, height: 1.4),
+                ),
+                SizedBox(height: 16),
+                Text('Solana Address:',
+                    style: TextStyle(color: ThemeColor.color0, fontWeight: FontWeight.bold)),
+                SizedBox(height: 4),
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: ThemeColor.color190,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    _walletService.address,
+                    style: TextStyle(
+                        color: Color(0xFF14F195),
+                        fontSize: 12,
+                        fontFamily: 'monospace'),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This wallet is deterministically derived from your Nostr key. '
+                          'Same 0xchat account = same Solana address. No mnemonic backup needed.',
+                          style: TextStyle(color: Colors.blue, fontSize: 11, height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Got it!',
+                    style: TextStyle(color: Color(0xFF14F195), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       OXLoading.dismiss();
