@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
@@ -525,6 +526,7 @@ class _SwapPageState extends State<SwapPage> {
 
   Future<void> _executeSwap() async {
     if (_quote == null) return;
+    HapticFeedback.lightImpact();
 
     final amountStr = _amountController.text.trim();
     final amount = double.tryParse(amountStr) ?? 0;

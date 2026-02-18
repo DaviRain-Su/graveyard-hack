@@ -641,7 +641,10 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     required VoidCallback onTap,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Container(
         padding: EdgeInsets.symmetric(vertical: Adapt.px(16)),
         decoration: BoxDecoration(
@@ -670,7 +673,10 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: onTap,
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
         icon: Icon(icon, color: fgColor),
         label: Text(label, style: TextStyle(color: fgColor, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(

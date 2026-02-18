@@ -243,6 +243,7 @@ class _SendTokenPageState extends State<SendTokenPage> {
 
     if (confirmed != true) return;
 
+    HapticFeedback.lightImpact();
     try {
       OXLoading.show();
       final sig = await _walletService.sendSplToken(

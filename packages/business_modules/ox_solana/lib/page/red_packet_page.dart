@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
@@ -373,6 +374,7 @@ class _RedPacketPageState extends State<RedPacketPage> {
   }
 
   Future<void> _createRedPacket() async {
+    HapticFeedback.lightImpact();
     final totalAmount = _type == RedPacketType.equal && widget.isGroup
         ? _amount * _count
         : _amount;
