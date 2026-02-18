@@ -17,6 +17,7 @@ import 'page/red_packet_page.dart';
 import 'page/audius_page.dart';
 import 'page/nft_gallery_page.dart';
 import 'page/dapp_connect_page.dart';
+import 'services/audius_service.dart';
 import 'services/nft_service.dart';
 import 'services/dapp_connect_service.dart';
 import 'services/chat_transfer_service.dart';
@@ -77,13 +78,30 @@ class OXSolana extends OXFlutterModule {
                   onCreated: params?['onCreated'],
                 ));
       case 'AudiusPage':
+        final rawCallback = params?['onTrackSelected'];
+        // If callback expects Map (cross-module), wrap to convert AudiusTrack → Map
+        Function(AudiusTrack)? typedCallback;
+        if (rawCallback is Function(Map<String, dynamic>)) {
+          typedCallback = (AudiusTrack track) {
+            rawCallback(track.toJson());
+          };
+        } else if (rawCallback is Function(AudiusTrack)) {
+          typedCallback = rawCallback;
+        } else if (rawCallback is Function(dynamic)) {
+          typedCallback = (AudiusTrack track) {
+            rawCallback(track.toJson());
+          };
+        }
         return OXNavigator.pushPage(
             context,
             (ctx) => AudiusPage(
-                  onTrackSelected: params?['onTrackSelected'],
+                  onTrackSelected: typedCallback,
                 ));
       case 'NftGalleryPage':
-        return OXNavigator.pushPage(context, (ctx) => const NftGalleryPage());
+        return OXNavigator.pushPage(context, (ctx) => NftGalleryPage(
+          pickerMode: params?['pickerMode'] ?? false,
+          onNftSelected: params?['onNftSelected'],
+        ));
       case 'DappConnectPage':
         return OXNavigator.pushPage(context, (ctx) => const DappConnectPage());
     }

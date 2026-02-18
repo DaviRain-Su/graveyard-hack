@@ -173,6 +173,18 @@ class AudiusTrack {
     if (artworkUrl != null) 'artwork_url': artworkUrl,
   };
 
+  /// Convert to Map for cross-module boundary (chat integration)
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'artist': artistName,
+    'artwork': artworkUrl ?? '',
+    'duration': duration,
+    'share_url': shareUrl,
+    'stream_url': streamUrl,
+    'play_count': playCount,
+  };
+
   /// Parse from chat message
   static AudiusTrack? fromSharePayload(Map<String, dynamic> data) {
     if (data['type'] != 'audius_track') return null;

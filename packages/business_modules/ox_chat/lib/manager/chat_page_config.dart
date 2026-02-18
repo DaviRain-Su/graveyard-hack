@@ -13,6 +13,7 @@ import 'package:ox_common/utils/platform_utils.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_image_gallery.dart';
 import 'package:ox_common/widgets/common_toast.dart';
+import 'package:ox_common/business_interface/ox_chat/interface.dart';
 import 'package:ox_localizable/ox_localizable.dart';
 import 'package:ox_module_service/ox_module_service.dart';
 import 'package:photo_view/photo_view.dart' show PhotoViewComputedScale;
@@ -51,6 +52,10 @@ class ChatPageConfig {
       InputMoreItemEx.ecash(handler),
       // SOL Red Packet — works in both group and single chats
       InputMoreItemEx.solRedPacket(handler),
+      // Share NFT in chat
+      InputMoreItemEx.shareNft(handler),
+      // Share Audius music in chat
+      InputMoreItemEx.shareMusic(handler),
     ];
 
     final otherUser = handler.otherUser;
@@ -252,6 +257,89 @@ extension InputMoreItemEx on InputMoreItem {
           final isGroup = handler.session.hasMultipleUsers;
           OXModuleService.pushPage(context, 'ox_solana', 'RedPacketPage', {
             'isGroup': isGroup,
+          });
+        },
+      );
+
+  /// Share NFT — pick from wallet, send as rich link in chat
+  static InputMoreItem shareNft(ChatGeneralHandler handler) =>
+      InputMoreItem(
+        id: 'shareNft',
+        title: () => 'NFT',
+        iconName: 'chat_ecash_icon.png', // reuse icon
+        action: (context) {
+          final hasSolanaWallet = OXModuleService.invoke('ox_solana', 'hasSolanaWallet', []);
+          if (hasSolanaWallet != true) {
+            CommonToast.instance.show(context, 'Create a Solana wallet first');
+            return;
+          }
+
+          // Open NFT gallery in picker mode → on pick, send template message
+          OXModuleService.pushPage(context, 'ox_solana', 'NftGalleryPage', {
+            'pickerMode': true,
+            'onNftSelected': (Map<String, dynamic> nft) {
+              final name = nft['name'] ?? 'NFT';
+              final collection = nft['collection'] ?? '';
+              final mint = nft['mint'] ?? '';
+              final image = nft['imageUrl'] ?? '';
+
+              // Send as template message in current chat
+              final receiverPubkey = handler.otherUser?.pubKey ?? '';
+              if (receiverPubkey.isEmpty && !handler.session.hasMultipleUsers) {
+                CommonToast.instance.show(context, 'Cannot determine recipient');
+                return;
+              }
+
+              OXChatInterface.sendTemplateMessage(
+                context,
+                receiverPubkey: receiverPubkey,
+                title: '🖼️ $name',
+                subTitle: collection.isNotEmpty ? '$collection\nsolana:nft:$mint' : 'solana:nft:$mint',
+                icon: image,
+                link: 'https://explorer.solana.com/address/$mint',
+                chatType: handler.session.chatType,
+              );
+            },
+          });
+        },
+      );
+
+  /// Share Audius music — pick trending or search, send as rich link
+  static InputMoreItem shareMusic(ChatGeneralHandler handler) =>
+      InputMoreItem(
+        id: 'shareMusic',
+        title: () => '🎵 Music',
+        iconName: 'chat_more_icon.png', // reuse icon
+        action: (context) {
+          // Open Audius in picker mode → on pick, send template message
+          OXModuleService.pushPage(context, 'ox_solana', 'AudiusPage', {
+            'onTrackSelected': (dynamic track) {
+              // track is an AudiusTrack — extract fields via module boundary
+              final trackMap = track as Map<String, dynamic>? ?? {};
+              final title = trackMap['title'] ?? 'Track';
+              final artist = trackMap['artist'] ?? '';
+              final artwork = trackMap['artwork'] ?? '';
+              final shareUrl = trackMap['share_url'] ?? '';
+
+              final receiverPubkey = handler.otherUser?.pubKey ?? '';
+              if (receiverPubkey.isEmpty && !handler.session.hasMultipleUsers) {
+                CommonToast.instance.show(context, 'Cannot determine recipient');
+                return;
+              }
+
+              OXChatInterface.sendTemplateMessage(
+                context,
+                receiverPubkey: receiverPubkey,
+                title: '🎵 $title',
+                subTitle: 'by $artist',
+                icon: artwork,
+                link: shareUrl,
+                chatType: handler.session.chatType,
+              );
+
+              // Pop back to chat
+              Navigator.of(context).pop();
+            },
           });
         },
       );

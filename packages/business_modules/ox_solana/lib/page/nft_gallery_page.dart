@@ -7,8 +7,12 @@ import 'package:ox_common/widgets/common_appbar.dart';
 import '../services/nft_service.dart';
 
 /// NFT Gallery page — display wallet's NFT collection in a grid
+/// When [onNftSelected] is provided, tapping an NFT calls it instead of showing detail.
 class NftGalleryPage extends StatefulWidget {
-  const NftGalleryPage({super.key});
+  final Function(Map<String, dynamic>)? onNftSelected;
+  final bool pickerMode;
+
+  const NftGalleryPage({super.key, this.onNftSelected, this.pickerMode = false});
 
   @override
   State<NftGalleryPage> createState() => _NftGalleryPageState();
@@ -130,7 +134,22 @@ class _NftGalleryPageState extends State<NftGalleryPage> {
 
   Widget _buildNftCard(SolanaNft nft) {
     return GestureDetector(
-      onTap: () => _showNftDetail(nft),
+      onTap: () {
+        if (widget.pickerMode || widget.onNftSelected != null) {
+          final nftMap = {
+            'name': nft.name,
+            'collection': nft.collection ?? '',
+            'mint': nft.mint,
+            'imageUrl': nft.imageUrl ?? '',
+            'symbol': nft.symbol,
+            'description': nft.description,
+          };
+          widget.onNftSelected?.call(nftMap);
+          Navigator.of(context).pop();
+          return;
+        }
+        _showNftDetail(nft);
+      },
       child: Container(
         decoration: BoxDecoration(
           color: ThemeColor.color180,
