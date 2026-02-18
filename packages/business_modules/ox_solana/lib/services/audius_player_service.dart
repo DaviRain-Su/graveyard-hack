@@ -5,10 +5,26 @@ import 'audius_service.dart';
 
 /// Global Audius music player — survives page navigation.
 /// Like WeChat mini-program: music keeps playing when you go back to chat.
+///
+/// iOS: UIBackgroundModes=audio is set in Info.plist.
+/// audioplayers uses AVAudioSession.playback category by default,
+/// which keeps audio playing when app goes to background/lock screen.
 class AudiusPlayerService extends ChangeNotifier {
   static final AudiusPlayerService instance = AudiusPlayerService._();
   AudiusPlayerService._() {
     _setupListeners();
+    // Set audio context for background playback
+    _player.setAudioContext(AudioContext(
+      iOS: AudioContextIOS(
+        category: AVAudioSessionCategory.playback,
+        options: {AVAudioSessionOptions.mixWithOthers},
+      ),
+      android: AudioContextAndroid(
+        isSpeakerphoneOn: false,
+        audioMode: AndroidAudioMode.normal,
+        audioFocus: AndroidAudioFocus.gain,
+      ),
+    ));
   }
 
   final AudioPlayer _player = AudioPlayer();

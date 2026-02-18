@@ -30,12 +30,21 @@ class AudiusService {
     return [];
   }
 
-  /// Get trending tracks
-  Future<List<AudiusTrack>> getTrending({int limit = 10}) async {
+  /// Available genres for browsing
+  static const List<String> genres = [
+    'Electronic', 'Hip-Hop/Rap', 'Pop', 'R&B/Soul', 'Rock',
+    'Lo-Fi', 'House', 'Techno', 'Ambient', 'Drum & Bass',
+    'Dubstep', 'Trap', 'Jazz', 'Classical', 'Reggae',
+  ];
+
+  /// Get trending tracks (optionally filtered by genre)
+  Future<List<AudiusTrack>> getTrending({int limit = 10, String? genre}) async {
     try {
-      final uri = Uri.parse('$_baseUrl/tracks/trending').replace(queryParameters: {
+      final params = <String, String>{
         'limit': limit.toString(),
-      });
+        if (genre != null) 'genre': genre,
+      };
+      final uri = Uri.parse('$_baseUrl/tracks/trending').replace(queryParameters: params);
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {

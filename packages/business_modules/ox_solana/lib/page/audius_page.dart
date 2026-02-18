@@ -27,6 +27,7 @@ class _AudiusPageState extends State<AudiusPage> {
   bool _isLoading = true;
   bool _isSearching = false;
   String _currentTab = 'trending';
+  String? _selectedGenre;
 
   // ── Global Audio Player (survives page navigation) ──
   final _playerService = AudiusPlayerService.instance;
@@ -57,9 +58,9 @@ class _AudiusPageState extends State<AudiusPage> {
     super.dispose();
   }
 
-  Future<void> _loadTrending() async {
-    setState(() { _isLoading = true; _currentTab = 'trending'; });
-    final tracks = await AudiusService.instance.getTrending(limit: 20);
+  Future<void> _loadTrending({String? genre}) async {
+    setState(() { _isLoading = true; _currentTab = 'trending'; _selectedGenre = genre; });
+    final tracks = await AudiusService.instance.getTrending(limit: 20, genre: genre);
     setState(() { _tracks = tracks; _isLoading = false; });
   }
 
@@ -142,13 +143,30 @@ class _AudiusPageState extends State<AudiusPage> {
             ),
           ),
 
+          // Genre filter chips
+          if (_currentTab == 'trending')
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: Adapt.px(12)),
+                children: [
+                  _buildGenreChip('All', null),
+                  ...AudiusService.genres.take(10).map((g) => _buildGenreChip(g, g)),
+                ],
+              ),
+            ),
+          SizedBox(height: 8),
+
           // Tab indicator
           Padding(
             padding: EdgeInsets.symmetric(horizontal: Adapt.px(16)),
             child: Row(
               children: [
                 Text(
-                  _currentTab == 'trending' ? '🔥 Trending' : '🔍 Results',
+                  _currentTab == 'trending'
+                      ? (_selectedGenre != null ? '🎸 $_selectedGenre' : '🔥 Trending')
+                      : '🔍 Results',
                   style: TextStyle(
                     color: ThemeColor.color0,
                     fontSize: 16,
@@ -183,6 +201,35 @@ class _AudiusPageState extends State<AudiusPage> {
           // Mini player
           if (_currentTrack != null) _buildMiniPlayer(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGenreChip(String label, String? genre) {
+    final isSelected = _selectedGenre == genre;
+    return Padding(
+      padding: EdgeInsets.only(right: 6),
+      child: GestureDetector(
+        onTap: () => _loadTrending(genre: genre),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? Color(0xFF9945FF) : ThemeColor.color180,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? Color(0xFF9945FF) : ThemeColor.color160,
+              width: 0.5,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : ThemeColor.color100,
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -635,7 +682,6 @@ class _NowPlayingSheetState extends State<_NowPlayingSheet> {
     if (mounted) setState(() {});
   }
 
-  @override
   @override
   void dispose() {
     _playerService.removeListener(_onChanged);
