@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
@@ -7,9 +10,8 @@ import 'package:ox_common/widgets/common_toast.dart';
 
 import '../services/audius_service.dart';
 
-/// Audius music page — browse, search, and share decentralized music
+/// Audius music page — browse, search, and **play** decentralized music
 class AudiusPage extends StatefulWidget {
-  /// If onTrackSelected is provided, selecting a track calls it (for chat share)
   final Function(AudiusTrack track)? onTrackSelected;
 
   const AudiusPage({super.key, this.onTrackSelected});
@@ -25,14 +27,52 @@ class _AudiusPageState extends State<AudiusPage> {
   bool _isSearching = false;
   String _currentTab = 'trending';
 
+  // ── Audio Player ──
+  final AudioPlayer _player = AudioPlayer();
+  AudiusTrack? _currentTrack;
+  PlayerState _playerState = PlayerState.stopped;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  StreamSubscription? _stateSub;
+  StreamSubscription? _posSub;
+  StreamSubscription? _durSub;
+
   @override
   void initState() {
     super.initState();
     _loadTrending();
+    _setupPlayerListeners();
+  }
+
+  void _setupPlayerListeners() {
+    _stateSub = _player.onPlayerStateChanged.listen((state) {
+      if (mounted) setState(() => _playerState = state);
+    });
+    _posSub = _player.onPositionChanged.listen((pos) {
+      if (mounted) setState(() => _position = pos);
+    });
+    _durSub = _player.onDurationChanged.listen((dur) {
+      if (mounted) setState(() => _duration = dur);
+    });
+    _player.onPlayerComplete.listen((_) {
+      // Auto-play next track
+      if (_currentTrack != null) {
+        final idx = _tracks.indexOf(_currentTrack!);
+        if (idx >= 0 && idx < _tracks.length - 1) {
+          _playTrack(_tracks[idx + 1]);
+        } else {
+          if (mounted) setState(() => _playerState = PlayerState.stopped);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _stateSub?.cancel();
+    _posSub?.cancel();
+    _durSub?.cancel();
+    _player.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -51,6 +91,53 @@ class _AudiusPageState extends State<AudiusPage> {
     setState(() { _isSearching = true; _currentTab = 'search'; });
     final tracks = await AudiusService.instance.searchTracks(query, limit: 20);
     setState(() { _tracks = tracks; _isSearching = false; });
+  }
+
+  // ── Playback controls ──
+
+  Future<void> _playTrack(AudiusTrack track) async {
+    try {
+      setState(() {
+        _currentTrack = track;
+        _position = Duration.zero;
+        _duration = Duration.zero;
+      });
+      await _player.stop();
+      await _player.play(UrlSource(track.streamUrl));
+    } catch (e) {
+      if (mounted) {
+        CommonToast.instance.show(context, 'Playback error: $e');
+      }
+    }
+  }
+
+  Future<void> _togglePlayPause() async {
+    if (_playerState == PlayerState.playing) {
+      await _player.pause();
+    } else if (_currentTrack != null) {
+      await _player.resume();
+    }
+  }
+
+  Future<void> _playNext() async {
+    if (_currentTrack == null) return;
+    final idx = _tracks.indexOf(_currentTrack!);
+    if (idx >= 0 && idx < _tracks.length - 1) {
+      _playTrack(_tracks[idx + 1]);
+    }
+  }
+
+  Future<void> _playPrev() async {
+    if (_currentTrack == null) return;
+    // If > 3s into track, restart; otherwise go to previous
+    if (_position.inSeconds > 3) {
+      await _player.seek(Duration.zero);
+    } else {
+      final idx = _tracks.indexOf(_currentTrack!);
+      if (idx > 0) {
+        _playTrack(_tracks[idx - 1]);
+      }
+    }
   }
 
   @override
@@ -126,39 +213,62 @@ class _AudiusPageState extends State<AudiusPage> {
                         child: Text('No tracks found',
                             style: TextStyle(color: ThemeColor.color100)))
                     : ListView.builder(
+                        padding: EdgeInsets.only(bottom: _currentTrack != null ? 140 : 0),
                         itemCount: _tracks.length,
                         itemBuilder: (ctx, i) => _buildTrackItem(_tracks[i], i + 1),
                       ),
           ),
+
+          // Mini player
+          if (_currentTrack != null) _buildMiniPlayer(),
         ],
       ),
     );
   }
 
   Widget _buildTrackItem(AudiusTrack track, int index) {
+    final isPlaying = _currentTrack?.id == track.id;
+    final isActive = isPlaying && _playerState == PlayerState.playing;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Adapt.px(12), vertical: 2),
       decoration: BoxDecoration(
-        color: ThemeColor.color180,
+        color: isPlaying
+            ? Color(0xFF9945FF).withOpacity(0.12)
+            : ThemeColor.color180,
         borderRadius: BorderRadius.circular(10),
+        border: isPlaying
+            ? Border.all(color: Color(0xFF9945FF).withOpacity(0.3))
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: () => _showTrackOptions(track),
+          onTap: () {
+            if (isPlaying) {
+              _togglePlayPause();
+            } else {
+              _playTrack(track);
+            }
+          },
+          onLongPress: () => _showTrackOptions(track),
           child: Padding(
             padding: EdgeInsets.all(12),
             child: Row(
               children: [
-                // Index number
+                // Play/index indicator
                 SizedBox(
-                  width: 24,
-                  child: Text(
-                    '$index',
-                    style: TextStyle(color: ThemeColor.color110, fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
+                  width: 28,
+                  child: isActive
+                      ? _buildEqualizer()
+                      : isPlaying
+                          ? Icon(Icons.pause, size: 18, color: Color(0xFF9945FF))
+                          : Text(
+                              '$index',
+                              style: TextStyle(color: ThemeColor.color110, fontSize: 13),
+                              textAlign: TextAlign.center,
+                            ),
                 ),
                 SizedBox(width: 10),
 
@@ -171,9 +281,9 @@ class _AudiusPageState extends State<AudiusPage> {
                           width: 44,
                           height: 44,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholderArt(track),
+                          errorBuilder: (_, __, ___) => _buildPlaceholderArt(),
                         )
-                      : _buildPlaceholderArt(track),
+                      : _buildPlaceholderArt(),
                 ),
                 SizedBox(width: 12),
 
@@ -185,7 +295,7 @@ class _AudiusPageState extends State<AudiusPage> {
                       Text(
                         track.title,
                         style: TextStyle(
-                          color: ThemeColor.color0,
+                          color: isPlaying ? Color(0xFF9945FF) : ThemeColor.color0,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -195,7 +305,10 @@ class _AudiusPageState extends State<AudiusPage> {
                       SizedBox(height: 2),
                       Text(
                         track.artistName,
-                        style: TextStyle(color: ThemeColor.color100, fontSize: 12),
+                        style: TextStyle(
+                          color: isPlaying ? Color(0xFF9945FF).withOpacity(0.7) : ThemeColor.color100,
+                          fontSize: 12,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -224,6 +337,13 @@ class _AudiusPageState extends State<AudiusPage> {
                     ),
                   ],
                 ),
+
+                // More options
+                SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _showTrackOptions(track),
+                  child: Icon(Icons.more_vert, size: 18, color: ThemeColor.color110),
+                ),
               ],
             ),
           ),
@@ -232,10 +352,163 @@ class _AudiusPageState extends State<AudiusPage> {
     );
   }
 
-  Widget _buildPlaceholderArt(AudiusTrack track) {
+  // ── Mini Player (bottom bar) ──
+
+  Widget _buildMiniPlayer() {
+    final track = _currentTrack!;
+    final isPlaying = _playerState == PlayerState.playing;
+    final progress = _duration.inMilliseconds > 0
+        ? _position.inMilliseconds / _duration.inMilliseconds
+        : 0.0;
+
+    return GestureDetector(
+      onTap: () => _showNowPlayingSheet(track),
+      child: Container(
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          border: Border(top: BorderSide(color: ThemeColor.color160, width: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Progress bar
+            LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              backgroundColor: ThemeColor.color170,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF9945FF)),
+              minHeight: 2,
+            ),
+            // Player content
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  // Artwork
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: track.artworkUrl != null
+                        ? Image.network(
+                            track.artworkUrl!,
+                            width: 42,
+                            height: 42,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildPlaceholderArt(size: 42),
+                          )
+                        : _buildPlaceholderArt(size: 42),
+                  ),
+                  SizedBox(width: 10),
+
+                  // Title + artist
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          track.title,
+                          style: TextStyle(
+                            color: ThemeColor.color0,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          track.artistName,
+                          style: TextStyle(color: ThemeColor.color100, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Controls
+                  IconButton(
+                    icon: Icon(Icons.skip_previous_rounded,
+                        color: ThemeColor.color0, size: 28),
+                    onPressed: _playPrev,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(minWidth: 36),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                      color: Color(0xFF9945FF),
+                      size: 38,
+                    ),
+                    onPressed: _togglePlayPause,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(minWidth: 42),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.skip_next_rounded,
+                        color: ThemeColor.color0, size: 28),
+                    onPressed: _playNext,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(minWidth: 36),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Now Playing Full Sheet ──
+
+  void _showNowPlayingSheet(AudiusTrack track) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThemeColor.color190,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _NowPlayingSheet(
+        track: track,
+        player: _player,
+        playerState: _playerState,
+        position: _position,
+        duration: _duration,
+        onTogglePlay: _togglePlayPause,
+        onNext: _playNext,
+        onPrev: _playPrev,
+        onSeek: (pos) => _player.seek(pos),
+        onShare: widget.onTrackSelected != null
+            ? () {
+                Navigator.pop(ctx);
+                widget.onTrackSelected!(track);
+                Navigator.pop(context);
+              }
+            : null,
+      ),
+    );
+  }
+
+  // ── Equalizer animation ──
+
+  Widget _buildEqualizer() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (i) => _EqualizerBar(delay: i * 100)),
+    );
+  }
+
+  Widget _buildPlaceholderArt({double size = 44}) {
     return Container(
-      width: 44,
-      height: 44,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF9945FF), Color(0xFF14F195)],
@@ -243,10 +516,12 @@ class _AudiusPageState extends State<AudiusPage> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Center(
-        child: Text('🎵', style: TextStyle(fontSize: 20)),
+        child: Text('🎵', style: TextStyle(fontSize: size * 0.45)),
       ),
     );
   }
+
+  // ── Track options (long press / more button) ──
 
   void _showTrackOptions(AudiusTrack track) {
     showModalBottomSheet(
@@ -267,19 +542,23 @@ class _AudiusPageState extends State<AudiusPage> {
                   borderRadius: BorderRadius.circular(8),
                   child: track.artworkUrl != null
                       ? Image.network(track.artworkUrl!, width: 60, height: 60, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildPlaceholderArt(track))
-                      : _buildPlaceholderArt(track),
+                          errorBuilder: (_, __, ___) => _buildPlaceholderArt(size: 60))
+                      : _buildPlaceholderArt(size: 60),
                 ),
                 SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(track.title, style: TextStyle(color: ThemeColor.color0, fontSize: 16, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(track.title,
+                          style: TextStyle(color: ThemeColor.color0, fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
                       SizedBox(height: 4),
-                      Text(track.artistName, style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+                      Text(track.artistName,
+                          style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
                       if (track.genre != null)
-                        Text(track.genre!, style: TextStyle(color: ThemeColor.color110, fontSize: 11)),
+                        Text(track.genre!,
+                            style: TextStyle(color: ThemeColor.color110, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -287,8 +566,12 @@ class _AudiusPageState extends State<AudiusPage> {
             ),
             SizedBox(height: 20),
 
-            // Actions
-            _buildActionTile(Icons.play_circle_outline, 'Play in Browser', () {
+            _buildActionTile(Icons.play_circle_filled, 'Play Now', () {
+              Navigator.pop(ctx);
+              _playTrack(track);
+            }),
+
+            _buildActionTile(Icons.open_in_browser, 'Open on Audius', () {
               Navigator.pop(ctx);
               launchUrl(Uri.parse(track.shareUrl), mode: LaunchMode.externalApplication);
             }),
@@ -302,13 +585,8 @@ class _AudiusPageState extends State<AudiusPage> {
 
             _buildActionTile(Icons.link, 'Copy Link', () {
               Navigator.pop(ctx);
-              // Copy share URL
-              CommonToast.instance.show(context, 'Link copied: ${track.shareUrl}');
-            }),
-
-            _buildActionTile(Icons.music_note, 'Stream URL', () {
-              Navigator.pop(ctx);
-              CommonToast.instance.show(context, track.streamUrl);
+              Clipboard.setData(ClipboardData(text: track.shareUrl));
+              CommonToast.instance.show(context, 'Link copied! 🔗');
             }),
 
             SizedBox(height: 16),
@@ -324,6 +602,333 @@ class _AudiusPageState extends State<AudiusPage> {
       title: Text(label, style: TextStyle(color: ThemeColor.color0)),
       onTap: onTap,
       contentPadding: EdgeInsets.zero,
+    );
+  }
+}
+
+// ── Now Playing Sheet (full-height) ──
+
+class _NowPlayingSheet extends StatefulWidget {
+  final AudiusTrack track;
+  final AudioPlayer player;
+  final PlayerState playerState;
+  final Duration position;
+  final Duration duration;
+  final VoidCallback onTogglePlay;
+  final VoidCallback onNext;
+  final VoidCallback onPrev;
+  final Function(Duration) onSeek;
+  final VoidCallback? onShare;
+
+  const _NowPlayingSheet({
+    required this.track,
+    required this.player,
+    required this.playerState,
+    required this.position,
+    required this.duration,
+    required this.onTogglePlay,
+    required this.onNext,
+    required this.onPrev,
+    required this.onSeek,
+    this.onShare,
+  });
+
+  @override
+  State<_NowPlayingSheet> createState() => _NowPlayingSheetState();
+}
+
+class _NowPlayingSheetState extends State<_NowPlayingSheet> {
+  late PlayerState _state;
+  late Duration _pos;
+  late Duration _dur;
+  StreamSubscription? _sSub, _pSub, _dSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _state = widget.playerState;
+    _pos = widget.position;
+    _dur = widget.duration;
+    _sSub = widget.player.onPlayerStateChanged.listen((s) {
+      if (mounted) setState(() => _state = s);
+    });
+    _pSub = widget.player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _pos = p);
+    });
+    _dSub = widget.player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _dur = d);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sSub?.cancel();
+    _pSub?.cancel();
+    _dSub?.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final track = widget.track;
+    final isPlaying = _state == PlayerState.playing;
+    final progress = _dur.inMilliseconds > 0
+        ? _pos.inMilliseconds / _dur.inMilliseconds
+        : 0.0;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Column(
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: ThemeColor.color160,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          SizedBox(height: 8),
+          Text('Now Playing',
+              style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+          SizedBox(height: 24),
+
+          // Large artwork
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: track.artworkUrl != null
+                ? Image.network(
+                    track.artworkUrl!,
+                    width: 240,
+                    height: 240,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 240,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(child: Text('🎵', style: TextStyle(fontSize: 64))),
+                    ),
+                  )
+                : Container(
+                    width: 240,
+                    height: 240,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(child: Text('🎵', style: TextStyle(fontSize: 64))),
+                  ),
+          ),
+          SizedBox(height: 28),
+
+          // Title + artist
+          Text(
+            track.title,
+            style: TextStyle(
+              color: ThemeColor.color0,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 6),
+          Text(
+            track.artistName,
+            style: TextStyle(color: ThemeColor.color100, fontSize: 15),
+            textAlign: TextAlign.center,
+          ),
+          if (track.genre != null) ...[
+            SizedBox(height: 4),
+            Text(track.genre!,
+                style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+          ],
+
+          Spacer(),
+
+          // Progress bar
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 3,
+              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+              activeTrackColor: Color(0xFF9945FF),
+              inactiveTrackColor: ThemeColor.color170,
+              thumbColor: Color(0xFF9945FF),
+              overlayColor: Color(0xFF9945FF).withOpacity(0.2),
+            ),
+            child: Slider(
+              value: progress.clamp(0.0, 1.0),
+              onChanged: (v) {
+                final newPos = Duration(
+                    milliseconds: (v * _dur.inMilliseconds).round());
+                widget.onSeek(newPos);
+              },
+            ),
+          ),
+
+          // Time labels
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(_formatDuration(_pos),
+                    style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+                Text(_formatDuration(_dur),
+                    style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 16),
+
+          // Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: Icon(Icons.skip_previous_rounded,
+                    color: ThemeColor.color0, size: 36),
+                onPressed: widget.onPrev,
+              ),
+              SizedBox(width: 16),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Color(0xFF9945FF),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                  onPressed: widget.onTogglePlay,
+                ),
+              ),
+              SizedBox(width: 16),
+              IconButton(
+                icon: Icon(Icons.skip_next_rounded,
+                    color: ThemeColor.color0, size: 36),
+                onPressed: widget.onNext,
+              ),
+            ],
+          ),
+
+          SizedBox(height: 16),
+
+          // Bottom actions
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.onShare != null)
+                _buildSmallAction(Icons.send, 'Share', widget.onShare!),
+              _buildSmallAction(Icons.open_in_browser, 'Audius', () {
+                launchUrl(Uri.parse(track.shareUrl),
+                    mode: LaunchMode.externalApplication);
+              }),
+              _buildSmallAction(Icons.link, 'Copy', () {
+                Clipboard.setData(ClipboardData(text: track.shareUrl));
+                CommonToast.instance.show(context, 'Link copied! 🔗');
+              }),
+            ],
+          ),
+
+          SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmallAction(IconData icon, String label, VoidCallback onTap) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Icon(icon, color: ThemeColor.color110, size: 22),
+            SizedBox(height: 4),
+            Text(label, style: TextStyle(color: ThemeColor.color110, fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Equalizer animation bars ──
+
+class _EqualizerBar extends StatefulWidget {
+  final int delay;
+  const _EqualizerBar({this.delay = 0});
+
+  @override
+  State<_EqualizerBar> createState() => _EqualizerBarState();
+}
+
+class _EqualizerBarState extends State<_EqualizerBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 400 + widget.delay),
+    );
+    _anim = Tween<double>(begin: 4, end: 14).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _ctrl.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Container(
+        width: 3,
+        height: _anim.value,
+        margin: EdgeInsets.symmetric(horizontal: 1),
+        decoration: BoxDecoration(
+          color: Color(0xFF9945FF),
+          borderRadius: BorderRadius.circular(1.5),
+        ),
+      ),
     );
   }
 }
