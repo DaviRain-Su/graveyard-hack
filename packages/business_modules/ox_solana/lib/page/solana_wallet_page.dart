@@ -7,6 +7,7 @@ import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_common/widgets/common_loading.dart';
 
 import '../services/solana_wallet_service.dart';
+import '../widgets/token_list_widget.dart';
 import 'send_sol_page.dart';
 import 'receive_page.dart';
 
@@ -27,6 +28,7 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     _walletService.addListener(_onWalletChanged);
     if (_walletService.hasWallet) {
       _walletService.refreshBalance();
+      _walletService.fetchTokens();
     }
   }
 
@@ -182,9 +184,13 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
           ],
           SizedBox(height: Adapt.px(24)),
 
+          // SPL Token list
+          const TokenListWidget(),
+          SizedBox(height: Adapt.px(24)),
+
           // Address section
           _buildAddressSection(),
-          SizedBox(height: Adapt.px(24)),
+          SizedBox(height: Adapt.px(16)),
 
           // Explorer link
           _buildExplorerLink(),

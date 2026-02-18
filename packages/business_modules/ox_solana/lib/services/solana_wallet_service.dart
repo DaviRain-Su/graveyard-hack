@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:solana/solana.dart';
+import 'package:solana/dto.dart' hide Account;
 import 'package:ox_common/utils/storage_key_tool.dart';
 import 'package:chatcore/chat-core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../models/spl_token_info.dart';
 
 /// Solana wallet service — manages ed25519 key pair, balance, and transfers.
 /// Key storage: encrypted via SharedPreferences (same as 0xchat Nostr key).
@@ -176,6 +180,132 @@ class SolanaWalletService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyStorageKey);
     notifyListeners();
+  }
+
+  // --- SPL Token support ---
+
+  List<SplTokenInfo> _tokens = [];
+  List<SplTokenInfo> get tokens => _tokens;
+
+  bool _isLoadingTokens = false;
+  bool get isLoadingTokens => _isLoadingTokens;
+
+  /// Fetch all SPL token accounts owned by this wallet
+  Future<List<SplTokenInfo>> fetchTokens() async {
+    if (_keyPair == null || _client == null) return [];
+
+    try {
+      _isLoadingTokens = true;
+      notifyListeners();
+
+      final result = await _client!.rpcClient.getTokenAccountsByOwner(
+        address,
+        const TokenAccountsFilter.byProgramId(
+          'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+        ),
+        encoding: Encoding.jsonParsed,
+      );
+
+      final List<SplTokenInfo> tokenList = [];
+
+      for (final account in result.value) {
+        try {
+          final data = account.account.data;
+          if (data is ParsedAccountData) {
+            final parsed = data.parsed as Map<String, dynamic>;
+            final info = parsed['info'] as Map<String, dynamic>;
+            final tokenAmount = info['tokenAmount'] as Map<String, dynamic>;
+
+            final mint = info['mint'] as String;
+            final rawAmount = tokenAmount['amount'] as String;
+            final decimals = tokenAmount['decimals'] as int;
+            final uiAmount = int.parse(rawAmount) / math.pow(10, decimals);
+
+            // Skip zero-balance accounts
+            if (uiAmount == 0) continue;
+
+            // Lookup token metadata
+            final meta = WellKnownTokens.lookup(mint, isDevnet: _isDevnet);
+
+            tokenList.add(SplTokenInfo(
+              mintAddress: mint,
+              tokenAccountAddress: account.pubkey,
+              balance: uiAmount,
+              decimals: decimals,
+              symbol: meta?.symbol ?? 'SPL',
+              name: meta?.name ?? 'Unknown Token',
+            ));
+          }
+        } catch (e) {
+          if (kDebugMode) print('[OXSolana] Parse token error: $e');
+        }
+      }
+
+      // Sort: known tokens first, then by balance
+      tokenList.sort((a, b) {
+        final aKnown = a.symbol != 'SPL' ? 0 : 1;
+        final bKnown = b.symbol != 'SPL' ? 0 : 1;
+        if (aKnown != bKnown) return aKnown.compareTo(bKnown);
+        return b.balance.compareTo(a.balance);
+      });
+
+      _tokens = tokenList;
+      _error = null;
+
+      if (kDebugMode) {
+        print('[OXSolana] Found ${tokenList.length} token accounts');
+      }
+
+      return tokenList;
+    } catch (e) {
+      if (kDebugMode) print('[OXSolana] Fetch tokens error: $e');
+      _error = 'Failed to fetch tokens: $e';
+      return _tokens;
+    } finally {
+      _isLoadingTokens = false;
+      notifyListeners();
+    }
+  }
+
+  /// Send SPL token
+  Future<String> sendSplToken({
+    required String mintAddress,
+    required String toAddress,
+    required double amount,
+    required int decimals,
+  }) async {
+    if (_keyPair == null || _client == null) {
+      throw Exception('Wallet not initialized');
+    }
+
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final rawAmount = (amount * math.pow(10, decimals)).toInt();
+
+      final signature = await _client!.transferSplToken(
+        mint: Ed25519HDPublicKey.fromBase58(mintAddress),
+        destination: Ed25519HDPublicKey.fromBase58(toAddress),
+        amount: rawAmount,
+        owner: _keyPair!,
+      );
+
+      if (kDebugMode) {
+        print('[OXSolana] SPL transfer: $signature');
+      }
+
+      await fetchTokens();
+      return signature;
+    } catch (e) {
+      _error = 'SPL transfer failed: $e';
+      if (kDebugMode) print('[OXSolana] $_error');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   /// Request devnet airdrop (1 SOL)
