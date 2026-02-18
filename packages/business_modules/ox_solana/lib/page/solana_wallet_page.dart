@@ -7,9 +7,12 @@ import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_common/widgets/common_loading.dart';
 
 import '../services/solana_wallet_service.dart';
+import '../services/tapestry_service.dart';
 import '../widgets/token_list_widget.dart';
 import 'send_sol_page.dart';
 import 'receive_page.dart';
+import 'transaction_history_page.dart';
+import 'swap_page.dart';
 
 /// Main Solana wallet page — shows balance, address, and action buttons
 class SolanaWalletPage extends StatefulWidget {
@@ -150,28 +153,34 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                       MaterialPageRoute(builder: (_) => const SendSolPage())),
                 ),
               ),
-              SizedBox(width: Adapt.px(12)),
+              SizedBox(width: Adapt.px(10)),
               Expanded(
                 child: _buildActionButton(
                   icon: Icons.arrow_downward,
                   label: 'Receive',
-                  color: const Color(0xFF14F195), // Solana green
+                  color: const Color(0xFF14F195),
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const ReceivePage())),
                 ),
               ),
-              SizedBox(width: Adapt.px(12)),
+              SizedBox(width: Adapt.px(10)),
               Expanded(
                 child: _buildActionButton(
-                  icon: Icons.refresh,
-                  label: 'Refresh',
-                  color: ThemeColor.color100,
-                  onTap: () async {
-                    await _walletService.refreshBalance();
-                    if (mounted) {
-                      CommonToast.instance.show(context, 'Balance refreshed');
-                    }
-                  },
+                  icon: Icons.swap_horiz,
+                  label: 'Swap',
+                  color: const Color(0xFFF39C12),
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const SwapPage())),
+                ),
+              ),
+              SizedBox(width: Adapt.px(10)),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.history,
+                  label: 'History',
+                  color: const Color(0xFF3498DB),
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const TransactionHistoryPage())),
                 ),
               ),
             ],
@@ -299,6 +308,9 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
   }
 
   Widget _buildNostrBindingInfo() {
+    final tapestry = TapestryService.instance;
+    final isBound = tapestry.hasBoundProfile;
+
     return Container(
       padding: EdgeInsets.all(Adapt.px(16)),
       decoration: BoxDecoration(
@@ -308,24 +320,113 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Identity Binding',
-              style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
-          SizedBox(height: 8),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.link, size: 16, color: const Color(0xFF9945FF)),
-              SizedBox(width: 8),
-              Expanded(
+              Text('Identity Binding',
+                  style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isBound
+                      ? const Color(0xFF14F195).withOpacity(0.15)
+                      : Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: Text(
-                  'Nostr ↔ Solana linked via Tapestry',
-                  style: TextStyle(color: ThemeColor.color0, fontSize: 14),
+                  isBound ? 'Linked' : 'Not Linked',
+                  style: TextStyle(
+                    color: isBound ? const Color(0xFF14F195) : Colors.orange,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ),
+          SizedBox(height: 10),
+          if (isBound) ...[
+            Row(
+              children: [
+                Icon(Icons.link, size: 16, color: const Color(0xFF9945FF)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Nostr ↔ Solana linked via Tapestry',
+                    style: TextStyle(color: ThemeColor.color0, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+            if (tapestry.profile?.username != null) ...[
+              SizedBox(height: 4),
+              Text(
+                'Profile: ${tapestry.profile!.username}',
+                style: TextStyle(color: ThemeColor.color100, fontSize: 12),
+              ),
+            ],
+          ] else ...[
+            Text(
+              'Link your Nostr identity with your Solana wallet so contacts can send you tokens directly.',
+              style: TextStyle(color: ThemeColor.color100, fontSize: 13),
+            ),
+            SizedBox(height: 12),
+            GestureDetector(
+              onTap: _bindTapestry,
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9945FF).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    'Link Nostr ↔ Solana',
+                    style: TextStyle(
+                      color: const Color(0xFF9945FF),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _bindTapestry() async {
+    final nostrPubkey = _walletService.nostrPubkey;
+    if (nostrPubkey == null || nostrPubkey.isEmpty) {
+      CommonToast.instance.show(context, 'Please login to Nostr first');
+      return;
+    }
+
+    try {
+      OXLoading.show();
+      final profile = await TapestryService.instance.createProfile(
+        nostrPubkey: nostrPubkey,
+        solanaAddress: _walletService.address,
+      );
+      OXLoading.dismiss();
+
+      if (mounted) {
+        if (profile != null) {
+          CommonToast.instance.show(context, 'Identity linked! ✅');
+          setState(() {});
+        } else {
+          CommonToast.instance.show(context, 'Binding failed — check API key');
+        }
+      }
+    } catch (e) {
+      OXLoading.dismiss();
+      if (mounted) {
+        CommonToast.instance.show(context, 'Error: $e');
+      }
+    }
   }
 
   Widget _buildActionButton({

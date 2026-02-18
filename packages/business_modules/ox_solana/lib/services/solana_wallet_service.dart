@@ -8,6 +8,7 @@ import 'package:chatcore/chat-core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/spl_token_info.dart';
+import '../models/transaction_record.dart';
 
 /// Solana wallet service — manages ed25519 key pair, balance, and transfers.
 /// Key storage: encrypted via SharedPreferences (same as 0xchat Nostr key).
@@ -304,6 +305,53 @@ class SolanaWalletService extends ChangeNotifier {
       rethrow;
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // --- Transaction History ---
+
+  List<TransactionRecord> _history = [];
+  List<TransactionRecord> get history => _history;
+
+  bool _isLoadingHistory = false;
+  bool get isLoadingHistory => _isLoadingHistory;
+
+  /// Fetch recent transaction signatures
+  Future<List<TransactionRecord>> fetchHistory({int limit = 20}) async {
+    if (_keyPair == null || _client == null) return [];
+
+    try {
+      _isLoadingHistory = true;
+      notifyListeners();
+
+      final signatures = await _client!.rpcClient.getSignaturesForAddress(
+        address,
+        limit: limit,
+      );
+
+      _history = signatures.map((sig) => TransactionRecord(
+        signature: sig.signature,
+        slot: sig.slot,
+        blockTime: sig.blockTime,
+        isError: sig.err != null,
+        memo: sig.memo,
+        confirmationStatus: sig.confirmationStatus?.name,
+      )).toList();
+
+      _error = null;
+
+      if (kDebugMode) {
+        print('[OXSolana] Fetched ${_history.length} transactions');
+      }
+
+      return _history;
+    } catch (e) {
+      if (kDebugMode) print('[OXSolana] Fetch history error: $e');
+      _error = 'Failed to fetch history: $e';
+      return _history;
+    } finally {
+      _isLoadingHistory = false;
       notifyListeners();
     }
   }

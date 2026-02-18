@@ -5,9 +5,13 @@ import 'package:ox_common/navigator/navigator.dart';
 import 'package:ox_module_service/ox_module_service.dart';
 
 import 'services/solana_wallet_service.dart';
+import 'services/tapestry_service.dart';
 import 'page/solana_wallet_page.dart';
 import 'page/send_sol_page.dart';
 import 'page/receive_page.dart';
+import 'page/transaction_history_page.dart';
+import 'page/swap_page.dart';
+import 'services/chat_transfer_service.dart';
 
 class OXSolana extends OXFlutterModule {
   static final OXSolana shared = OXSolana._();
@@ -21,6 +25,7 @@ class OXSolana extends OXFlutterModule {
   Future<void> setup() async {
     await super.setup();
     await SolanaWalletService.instance.init();
+    await TapestryService.instance.init();
   }
 
   @override
@@ -39,6 +44,10 @@ class OXSolana extends OXFlutterModule {
                 ));
       case 'ReceivePage':
         return OXNavigator.pushPage(context, (ctx) => const ReceivePage());
+      case 'TransactionHistoryPage':
+        return OXNavigator.pushPage(context, (ctx) => const TransactionHistoryPage());
+      case 'SwapPage':
+        return OXNavigator.pushPage(context, (ctx) => const SwapPage());
     }
     return null;
   }
@@ -54,5 +63,15 @@ class OXSolana extends OXFlutterModule {
         // Widget interface for home tab bar embedding
         'solanaWalletPageWidget': (BuildContext context) =>
             const SolanaWalletPage(),
+        // Tapestry identity resolution (for chat transfers)
+        'resolveNostrToSolana': (String nostrPubkey) =>
+            TapestryService.instance.resolveNostrToSolana(nostrPubkey),
+        // Chat-integrated SOL transfer dialog
+        'showSendSolDialog': (BuildContext context,
+                {required String recipientNostrPubkey,
+                String? recipientName}) =>
+            ChatTransferService.showSendSolDialog(context,
+                recipientNostrPubkey: recipientNostrPubkey,
+                recipientName: recipientName),
       };
 }
