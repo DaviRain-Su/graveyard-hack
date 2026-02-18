@@ -259,6 +259,9 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
             _buildAirdropButton(),
             SizedBox(height: Adapt.px(10)),
             _buildDemoTransferButton(),
+          ] else ...[
+            SizedBox(height: Adapt.px(16)),
+            _buildMainnetProofButton(),
           ],
           SizedBox(height: Adapt.px(24)),
 
@@ -761,6 +764,38 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     );
   }
 
+  Widget _buildMainnetProofButton() {
+    return GestureDetector(
+      onTap: _runMainnetProofTransfer,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(vertical: Adapt.px(12)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF9945FF).withOpacity(0.2), Color(0xFF14F195).withOpacity(0.2)],
+          ),
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: Color(0xFF9945FF).withOpacity(0.4)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.verified, color: Color(0xFF9945FF), size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Mainnet Proof Transfer',
+              style: TextStyle(
+                color: Color(0xFF9945FF),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _requestAirdrop() async {
     try {
       OXLoading.show();
@@ -808,11 +843,77 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
 
     if (confirmed != true) return;
 
+    await _executeProofTransfer(amount: 0.01, title: 'Demo Transfer');
+  }
+
+  Future<void> _runMainnetProofTransfer() async {
+    HapticFeedback.lightImpact();
+    if (!_walletService.isMainnet) return;
+
+    final amountController = TextEditingController(text: '0.001');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text('Mainnet Proof Transfer', style: TextStyle(color: ThemeColor.color0)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('This will send real SOL to your own address.',
+                style: TextStyle(color: ThemeColor.color100)),
+            SizedBox(height: 12),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: ThemeColor.color0, fontSize: 20),
+              decoration: InputDecoration(
+                hintText: '0.001',
+                suffixText: 'SOL',
+                filled: true,
+                fillColor: ThemeColor.color190,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Send', style: TextStyle(color: Color(0xFF9945FF))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
+    if (amount <= 0) {
+      CommonToast.instance.show(context, 'Invalid amount');
+      return;
+    }
+    if (_walletService.balance < amount + 0.001) {
+      CommonToast.instance.show(context, 'Balance too low');
+      return;
+    }
+
+    await _executeProofTransfer(amount: amount, title: 'Mainnet Proof');
+  }
+
+  Future<void> _executeProofTransfer({required double amount, required String title}) async {
     try {
       OXLoading.show();
       final sig = await _walletService.sendSol(
         toAddress: _walletService.address,
-        amount: 0.01,
+        amount: amount,
       );
       final ok = await _walletService.waitForConfirmation(sig);
       OXLoading.dismiss();
@@ -828,6 +929,9 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('$title • ${_walletService.networkName}',
+                    style: TextStyle(color: ThemeColor.color100, fontSize: 12)),
+                SizedBox(height: 6),
                 Text('Signature', style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
                 SizedBox(height: 6),
                 Text(sig,
@@ -855,7 +959,7 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
       }
     } catch (e) {
       OXLoading.dismiss();
-      CommonToast.instance.show(context, 'Demo transfer failed: $e');
+      CommonToast.instance.show(context, '$title failed: $e');
     }
   }
 
