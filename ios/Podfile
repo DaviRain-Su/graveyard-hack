@@ -37,6 +37,16 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # Fix: Remove arm64 simulator exclusion from Pods xcconfig files
+  # This is needed for Apple Silicon Mac simulators
+  installer.generated_aggregate_targets.each do |aggregate_target|
+    aggregate_target.xcconfigs.each do |config_name, config|
+      config.attributes.delete('EXCLUDED_ARCHS[sdk=iphonesimulator*]')
+      xcconfig_path = aggregate_target.xcconfig_path(config_name)
+      config.save_as(xcconfig_path)
+    end
+  end
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     

@@ -103,6 +103,10 @@ dependency_overrides:
     path: packages/nostr-dart
   tor:
     path: packages/tor_stub
+  google_mlkit_translation:
+    path: packages/google_mlkit_translation_stub
+  google_mlkit_language_id:
+    path: packages/google_mlkit_language_id_stub
   value_layout_builder: ^0.5.0
   web_socket_channel: ^3.0.0
   # nostr_mls_package:

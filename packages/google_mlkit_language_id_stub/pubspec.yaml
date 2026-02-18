@@ -1,0 +1,12 @@
+name: google_mlkit_language_id
+description: Stub package for google_mlkit_language_id to enable iOS simulator builds on Apple Silicon.
+version: 0.13.0
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
