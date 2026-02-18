@@ -3,6 +3,7 @@ library ox_solana;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ox_common/navigator/navigator.dart';
+import 'package:ox_common/const/common_constant.dart';
 import 'package:ox_module_service/ox_module_service.dart';
 
 import 'services/solana_wallet_service.dart';
@@ -41,7 +42,7 @@ class OXSolana extends OXFlutterModule {
     await super.setup();
     await SolanaWalletService.instance.init();
     await TapestryService.instance.init(
-      apiKey: 'YOUR_TAPESTRY_API_KEY', // Default Tapestry API key
+      apiKey: CommonConstant.tapestryApiKey, // From gitignored config
     );
     await RedPacketService.instance.init();
     await DappConnectService.instance.init();
@@ -49,6 +50,31 @@ class OXSolana extends OXFlutterModule {
     await KydService.instance.init();
     // Pre-fetch token prices (non-blocking)
     PriceService.instance.fetchPrices();
+
+    // Auto-bind Tapestry profile when wallet is ready
+    _autoBindTapestry();
+    SolanaWalletService.instance.addListener(_autoBindTapestry);
+  }
+
+  void _autoBindTapestry() {
+    final wallet = SolanaWalletService.instance;
+    final tapestry = TapestryService.instance;
+    if (wallet.hasWallet && !tapestry.hasBoundProfile && tapestry.hasApiKey) {
+      final nostrPubkey = wallet.nostrPubkey;
+      final username = nostrPubkey.isNotEmpty
+          ? 'oxchat_${nostrPubkey.substring(0, 8)}'
+          : 'oxchat_${wallet.address.substring(0, 8)}';
+      tapestry.findOrCreateProfile(
+        walletAddress: wallet.address,
+        username: username,
+        bio: '0xchat × Solana user',
+        nostrPubkey: nostrPubkey.isNotEmpty ? nostrPubkey : null,
+      ).then((_) {
+        if (kDebugMode) print('[OXSolana] Auto-bound Tapestry profile: ${tapestry.profileId}');
+      }).catchError((e) {
+        if (kDebugMode) print('[OXSolana] Tapestry auto-bind failed: $e');
+      });
+    }
   }
 
   @override

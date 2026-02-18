@@ -66,4 +66,10 @@ abstract class ConstantInterface {
 
   /// Giphy API Key
   String get giphyApiKey;
+
+  /// Tapestry API Key (on-chain social graph)
+  String get tapestryApiKey => '';
+
+  /// Helius API Key (Solana RPC + NFT)
+  String get heliusApiKey => '';
 }
