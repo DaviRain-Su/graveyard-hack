@@ -33,7 +33,9 @@ class OXSolana extends OXFlutterModule {
   Future<void> setup() async {
     await super.setup();
     await SolanaWalletService.instance.init();
-    await TapestryService.instance.init();
+    await TapestryService.instance.init(
+      apiKey: 'YOUR_TAPESTRY_API_KEY', // Default Tapestry API key
+    );
     await RedPacketService.instance.init();
     await DappConnectService.instance.init();
     // Pre-fetch token prices (non-blocking)

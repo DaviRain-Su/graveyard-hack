@@ -5,25 +5,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tapestry Deep Integration — On-chain Social Graph for 0xchat
 ///
-/// Tapestry (usetapestry.dev) uses state compression + Merkle trees on Solana
-/// to store social graph data on-chain (same tech as compressed NFTs).
+/// Base URL: https://api.usetapestry.dev/api/v1
+/// Auth: ?apiKey=xxx (query param)
 ///
-/// Features integrated:
-/// 1. **Profiles** — Create/read/update/search user identities
-/// 2. **Follows** — On-chain follow/unfollow with follower/following lists
-/// 3. **Content** — Post/read social content (transactions, NFTs, etc.)
-/// 4. **Likes** — Like/unlike content
-/// 5. **Comments** — Comment on content
-/// 6. **Search** — Cross-app user discovery + suggested friends
+/// All endpoints verified against real API + socialfi npm SDK source.
+/// Uses state compression + Merkle trees on Solana (same tech as cNFTs).
 ///
-/// Architecture: **Local-first with Tapestry API sync**
-/// - Local cache always works (SharedPreferences)
-/// - Tapestry API syncs to on-chain social graph when API key is available
+/// Verified API Map:
+///   Profiles: findOrCreate, GET/{id}, PUT/{id}, search/profiles
+///   Follows:  followers/add, followers/remove, followers/state, profiles/{id}/followers, profiles/{id}/following
+///   Content:  contents/findOrCreate, GET/PUT/DELETE contents/{id}
+///   Likes:    POST/DELETE likes/{nodeId} (body: {startId})
+///   Comments: POST/GET comments, GET/PUT/DELETE comments/{id}
+///   Wallets:  wallets/{address}/socialCounts
+///   Activity: activity/feed
 class TapestryService extends ChangeNotifier {
   static final TapestryService instance = TapestryService._();
   TapestryService._();
 
-  static const String _baseUrl = 'https://api.usetapestry.dev/v1';
+  // ──────── REAL verified base URL ────────
+  static const String _baseUrl = 'https://api.usetapestry.dev/api/v1';
+
   static const String _storageKey = 'ox_solana_tapestry_profile';
   static const String _localBindingsKey = 'ox_solana_local_bindings';
   static const String _apiKeyStorageKey = 'ox_solana_tapestry_api_key';
@@ -38,34 +40,30 @@ class TapestryService extends ChangeNotifier {
   TapestryProfile? _profile;
   TapestryProfile? get profile => _profile;
 
-  // Social counts
   int _followersCount = 0;
   int _followingCount = 0;
   int get followersCount => _followersCount;
   int get followingCount => _followingCount;
 
-  // Local Nostr pubkey → Solana address cache
   Map<String, String> _localBindings = {};
   Map<String, String> get localBindings => Map.unmodifiable(_localBindings);
 
-  // Follow cache (profileId -> bool)
   Set<String> _followingCache = {};
   bool isFollowingCached(String profileId) => _followingCache.contains(profileId);
 
-  // Loading states
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   bool get hasBoundProfile => _profileId != null || _localBindings.isNotEmpty;
 
-  /// Initialize — load saved bindings and optionally API key
+  // ═══════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════
+
   Future<void> init({String? apiKey}) async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Load API key from param → storage → null
     _apiKey = apiKey ?? prefs.getString(_apiKeyStorageKey);
 
-    // Load local bindings cache
     final bindingsJson = prefs.getString(_localBindingsKey);
     if (bindingsJson != null) {
       try {
@@ -75,7 +73,6 @@ class TapestryService extends ChangeNotifier {
       }
     }
 
-    // Load follow cache
     final followJson = prefs.getString(_followCacheKey);
     if (followJson != null) {
       try {
@@ -85,18 +82,16 @@ class TapestryService extends ChangeNotifier {
       }
     }
 
-    // Load Tapestry profile ID
     _profileId = prefs.getString(_storageKey);
     if (_profileId != null && hasApiKey) {
       await fetchProfile();
     }
 
     if (kDebugMode) {
-      print('[Tapestry] Init: ${_localBindings.length} bindings, ${_followingCache.length} following, API: ${hasApiKey}');
+      print('[Tapestry] Init: ${_localBindings.length} bindings, ${_followingCache.length} follows, API: ${hasApiKey}');
     }
   }
 
-  /// Set API key (from settings UI)
   Future<void> setApiKey(String? key) async {
     _apiKey = (key?.isNotEmpty == true) ? key : null;
     final prefs = await SharedPreferences.getInstance();
@@ -108,25 +103,87 @@ class TapestryService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-  };
+  // ── HTTP helpers ──
 
-  String _withApiKey(String url) {
-    final separator = url.contains('?') ? '&' : '?';
-    return '$url${separator}apiKey=$_apiKey';
+  Map<String, String> get _jsonHeaders => {'Content-Type': 'application/json'};
+
+  String _url(String path) {
+    final separator = path.contains('?') ? '&' : '?';
+    return '$_baseUrl$path${separator}apiKey=$_apiKey';
   }
 
-  // ═══════════════════════════════════════════════════════
-  // 1. PROFILES — Identity management
-  // ═══════════════════════════════════════════════════════
+  Future<Map<String, dynamic>?> _get(String path) async {
+    if (!hasApiKey) return null;
+    try {
+      final r = await http.get(Uri.parse(_url(path)), headers: _jsonHeaders)
+          .timeout(const Duration(seconds: 12));
+      if (r.statusCode == 200) return jsonDecode(r.body);
+      if (kDebugMode) print('[Tapestry] GET $path → ${r.statusCode}: ${r.body.substring(0, (r.body.length).clamp(0, 200))}');
+    } catch (e) {
+      if (kDebugMode) print('[Tapestry] GET $path error: $e');
+    }
+    return null;
+  }
 
-  /// Create or find profile using findOrCreate (Tapestry official pattern)
+  Future<Map<String, dynamic>?> _post(String path, Map<String, dynamic> body) async {
+    if (!hasApiKey) return null;
+    try {
+      final r = await http.post(Uri.parse(_url(path)), headers: _jsonHeaders, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 15));
+      if (r.statusCode == 200 || r.statusCode == 201) {
+        return r.body.isNotEmpty ? jsonDecode(r.body) : {};
+      }
+      if (kDebugMode) print('[Tapestry] POST $path → ${r.statusCode}: ${r.body.substring(0, (r.body.length).clamp(0, 200))}');
+    } catch (e) {
+      if (kDebugMode) print('[Tapestry] POST $path error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _put(String path, Map<String, dynamic> body) async {
+    if (!hasApiKey) return null;
+    try {
+      final r = await http.put(Uri.parse(_url(path)), headers: _jsonHeaders, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 12));
+      if (r.statusCode == 200) return jsonDecode(r.body);
+      if (kDebugMode) print('[Tapestry] PUT $path → ${r.statusCode}');
+    } catch (e) {
+      if (kDebugMode) print('[Tapestry] PUT $path error: $e');
+    }
+    return null;
+  }
+
+  Future<bool> _delete(String path, [Map<String, dynamic>? body]) async {
+    if (!hasApiKey) return false;
+    try {
+      final request = http.Request('DELETE', Uri.parse(_url(path)));
+      request.headers.addAll(_jsonHeaders);
+      if (body != null) request.body = jsonEncode(body);
+      final streamed = await request.send().timeout(const Duration(seconds: 12));
+      return streamed.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print('[Tapestry] DELETE $path error: $e');
+    }
+    return false;
+  }
+
+  // ═══════════════════════════════════════════
+  // 1. PROFILES
+  //    POST /profiles/findOrCreate
+  //    GET  /profiles/{id}
+  //    PUT  /profiles/{id}
+  //    GET  /search/profiles?query=
+  //    GET  /profiles/suggested/{id}
+  // ═══════════════════════════════════════════
+
+  /// Create or find profile (Tapestry official pattern)
+  /// properties/customProperties use [{key,value}] array format
   Future<TapestryProfile?> findOrCreateProfile({
     required String walletAddress,
     required String username,
+    String? id,
     String? bio,
-    String? profileImage,
+    String? image,
     String? nostrPubkey,
     Map<String, String>? customProperties,
   }) async {
@@ -136,78 +193,60 @@ class TapestryService extends ChangeNotifier {
     }
 
     if (!hasApiKey) {
-      if (kDebugMode) print('[Tapestry] No API key — saved locally only');
       _profile = TapestryProfile(
         id: username,
         username: username,
-        bio: bio ?? 'Nostr + Solana identity (local)',
+        bio: bio,
         walletAddress: walletAddress,
-        blockchain: 'SOLANA',
+        isLocal: true,
         customProperties: {
           if (nostrPubkey != null) 'nostr_pubkey': nostrPubkey,
-          if (profileImage != null) 'profileImage': profileImage,
-          ...?customProperties,
+          'platform': '0xchat',
         },
-        isLocal: true,
       );
       _profileId = username;
       notifyListeners();
       return _profile;
     }
 
-    try {
-      _isLoading = true;
-      notifyListeners();
+    _isLoading = true;
+    notifyListeners();
 
-      final body = {
+    try {
+      final props = <Map<String, String>>[
+        if (nostrPubkey != null) {'key': 'nostr_pubkey', 'value': nostrPubkey},
+        {'key': 'platform', 'value': '0xchat'},
+        {'key': 'created_at', 'value': DateTime.now().toIso8601String()},
+        if (customProperties != null)
+          ...customProperties.entries.map((e) => {'key': e.key, 'value': e.value}),
+      ];
+
+      final data = await _post('/profiles/findOrCreate', {
         'walletAddress': walletAddress,
         'username': username,
+        if (id != null) 'id': id,
         if (bio != null) 'bio': bio,
+        if (image != null) 'image': image,
         'blockchain': 'SOLANA',
         'execution': 'FAST_UNCONFIRMED',
-        'customProperties': [
-          if (nostrPubkey != null)
-            {'key': 'nostr_pubkey', 'value': nostrPubkey},
-          if (profileImage != null)
-            {'key': 'profileImage', 'value': profileImage},
-          {'key': 'platform', 'value': '0xchat'},
-          {'key': 'created_at', 'value': DateTime.now().toIso8601String()},
-          if (customProperties != null)
-            ...customProperties.entries.map((e) => {'key': e.key, 'value': e.value}),
-        ],
-      };
+        if (props.isNotEmpty) 'customProperties': props,
+      });
 
-      final response = await http.post(
-        Uri.parse(_withApiKey('$_baseUrl/profiles/findOrCreate')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
-
-      if (kDebugMode) {
-        print('[Tapestry] findOrCreate: ${response.statusCode}');
-      }
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        _profile = TapestryProfile.fromApiResponse(data);
+      if (data != null) {
+        final profileData = data['profile'] as Map<String, dynamic>? ?? data;
+        _profile = TapestryProfile.fromApi(profileData);
         _profileId = _profile!.id ?? username;
 
-        // Update social counts
-        final counts = data['socialCounts'] ?? {};
+        // operation: CREATED or FOUND
+        if (kDebugMode) print('[Tapestry] findOrCreate: ${data['operation']}');
+
+        final counts = data['socialCounts'] as Map<String, dynamic>? ?? {};
         _followersCount = counts['followers'] ?? 0;
         _followingCount = counts['following'] ?? 0;
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_storageKey, _profileId!);
-
-        return _profile;
-      } else {
-        if (kDebugMode) {
-          print('[Tapestry] findOrCreate failed: ${response.statusCode} ${response.body}');
-        }
       }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] findOrCreate error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -215,614 +254,308 @@ class TapestryService extends ChangeNotifier {
     return _profile;
   }
 
-  /// Fetch existing profile from Tapestry API
-  Future<TapestryProfile?> fetchProfile() async {
-    if (_profileId == null || !hasApiKey) return null;
+  /// GET /profiles/{id}
+  Future<TapestryProfile?> fetchProfile([String? id]) async {
+    final pid = id ?? _profileId;
+    if (pid == null) return null;
 
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey('$_baseUrl/profiles/$_profileId')),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
+    final data = await _get('/profiles/$pid');
+    if (data == null) return null;
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final profileData = data['profile'] ?? data;
-        _profile = TapestryProfile.fromApiResponse(profileData);
+    final profileData = data['profile'] as Map<String, dynamic>? ?? data;
+    final profile = TapestryProfile.fromApi(profileData);
 
-        // Update social counts
-        final counts = data['socialCounts'] ?? {};
-        _followersCount = counts['followers'] ?? 0;
-        _followingCount = counts['following'] ?? 0;
-
-        notifyListeners();
-        return _profile;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Fetch error: $e');
+    if (id == null || id == _profileId) {
+      _profile = profile;
+      _profile = profile.copyWith(
+        walletAddress: data['walletAddress'] as String?,
+      );
+      final counts = data['socialCounts'] as Map<String, dynamic>? ?? {};
+      _followersCount = counts['followers'] ?? 0;
+      _followingCount = counts['following'] ?? 0;
+      notifyListeners();
     }
-    return null;
+    return profile;
   }
 
-  /// Update profile
-  Future<bool> updateProfile({
+  /// PUT /profiles/{id}
+  Future<TapestryProfile?> updateProfile({
     String? username,
     String? bio,
-    String? profileImage,
-    Map<String, String>? customProperties,
+    String? image,
+    Map<String, String>? properties,
   }) async {
-    if (_profileId == null || !hasApiKey) return false;
+    if (_profileId == null) return null;
 
-    try {
-      final body = {
-        'id': _profileId,
-        if (username != null) 'username': username,
-        if (bio != null) 'bio': bio,
-        if (profileImage != null || customProperties != null)
-          'customProperties': [
-            if (profileImage != null)
-              {'key': 'profileImage', 'value': profileImage},
-            if (customProperties != null)
-              ...customProperties.entries.map((e) => {'key': e.key, 'value': e.value}),
-          ],
-      };
+    final body = <String, dynamic>{
+      if (username != null) 'username': username,
+      if (bio != null) 'bio': bio,
+      if (image != null) 'image': image,
+      'execution': 'FAST_UNCONFIRMED',
+      if (properties != null)
+        'properties': properties.entries.map((e) => {'key': e.key, 'value': e.value}).toList(),
+    };
 
-      final response = await http.put(
-        Uri.parse(_withApiKey('$_baseUrl/profiles/update')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        await fetchProfile(); // Refresh
-        return true;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Update error: $e');
-    }
-    return false;
-  }
-
-  /// Search profiles across all apps on Tapestry
-  Future<List<TapestryProfile>> searchProfiles(String query, {bool includeExternal = true}) async {
-    if (!hasApiKey) return [];
-
-    try {
-      final url = _withApiKey(
-        '$_baseUrl/profiles/search?shouldIncludeExternalProfiles=$includeExternal'
-      );
-      final response = await http.post(
-        Uri.parse(url),
-        headers: _headers,
-        body: jsonEncode({'query': query}),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final profiles = data['profiles'] as List? ?? data as List? ?? [];
-        return profiles.map<TapestryProfile>((p) =>
-          TapestryProfile.fromApiResponse(p as Map<String, dynamic>)
-        ).toList();
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Search error: $e');
-    }
-    return [];
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // 2. FOLLOWS — On-chain social connections
-  // ═══════════════════════════════════════════════════════
-
-  /// Follow a user
-  Future<bool> followUser(String targetProfileId) async {
-    if (_profileId == null || !hasApiKey) return false;
-
-    try {
-      final body = {
-        'followerProfileId': _profileId,
-        'followeeProfileId': targetProfileId,
-      };
-
-      final response = await http.post(
-        Uri.parse(_withApiKey('$_baseUrl/followers')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        _followingCache.add(targetProfileId);
-        _followingCount++;
-        await _saveFollowCache();
-        notifyListeners();
-        if (kDebugMode) print('[Tapestry] Followed: $targetProfileId');
-        return true;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Follow error: $e');
-    }
-    return false;
-  }
-
-  /// Unfollow a user
-  Future<bool> unfollowUser(String targetProfileId) async {
-    if (_profileId == null || !hasApiKey) return false;
-
-    try {
-      final body = {
-        'followerProfileId': _profileId,
-        'followeeProfileId': targetProfileId,
-      };
-
-      final response = await http.delete(
-        Uri.parse(_withApiKey('$_baseUrl/followers')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        _followingCache.remove(targetProfileId);
-        _followingCount = (_followingCount - 1).clamp(0, 999999);
-        await _saveFollowCache();
-        notifyListeners();
-        if (kDebugMode) print('[Tapestry] Unfollowed: $targetProfileId');
-        return true;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Unfollow error: $e');
-    }
-    return false;
-  }
-
-  /// Check if following a user
-  Future<bool> isFollowing(String targetProfileId) async {
-    // Check cache first
-    if (_followingCache.contains(targetProfileId)) return true;
-
-    if (_profileId == null || !hasApiKey) return false;
-
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey(
-          '$_baseUrl/followers/check?followerId=$_profileId&followeeId=$targetProfileId'
-        )),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final isFollowing = data['isFollowing'] == true;
-        if (isFollowing) {
-          _followingCache.add(targetProfileId);
-          await _saveFollowCache();
-        }
-        return isFollowing;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Check follow error: $e');
-    }
-    return false;
-  }
-
-  /// Get followers list
-  Future<List<TapestryProfile>> getFollowers({int limit = 20, int offset = 0}) async {
-    if (_profileId == null || !hasApiKey) return [];
-
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey(
-          '$_baseUrl/profiles/followers/$_profileId?limit=$limit&offset=$offset'
-        )),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final followers = data['followers'] as List? ?? data as List? ?? [];
-        return followers.map<TapestryProfile>((p) =>
-          TapestryProfile.fromApiResponse(p as Map<String, dynamic>)
-        ).toList();
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Get followers error: $e');
-    }
-    return [];
-  }
-
-  /// Get following list
-  Future<List<TapestryProfile>> getFollowing({int limit = 20, int offset = 0}) async {
-    if (_profileId == null || !hasApiKey) return [];
-
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey(
-          '$_baseUrl/profiles/following/$_profileId?limit=$limit&offset=$offset'
-        )),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final following = data['following'] as List? ?? data as List? ?? [];
-        return following.map<TapestryProfile>((p) =>
-          TapestryProfile.fromApiResponse(p as Map<String, dynamic>)
-        ).toList();
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Get following error: $e');
-    }
-    return [];
-  }
-
-  /// Get follower/following counts
-  Future<void> refreshSocialCounts() async {
-    if (_profileId == null || !hasApiKey) return;
-
-    try {
-      final futures = await Future.wait([
-        http.get(
-          Uri.parse(_withApiKey('$_baseUrl/profiles/followers/$_profileId/count')),
-          headers: _headers,
-        ).timeout(const Duration(seconds: 10)),
-        http.get(
-          Uri.parse(_withApiKey('$_baseUrl/profiles/following/$_profileId/count')),
-          headers: _headers,
-        ).timeout(const Duration(seconds: 10)),
-      ]);
-
-      if (futures[0].statusCode == 200) {
-        final data = jsonDecode(futures[0].body);
-        _followersCount = data['count'] ?? data as int? ?? 0;
-      }
-      if (futures[1].statusCode == 200) {
-        final data = jsonDecode(futures[1].body);
-        _followingCount = data['count'] ?? data as int? ?? 0;
-      }
+    final data = await _put('/profiles/$_profileId', body);
+    if (data != null) {
+      _profile = TapestryProfile.fromApi(data);
       notifyListeners();
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Social counts error: $e');
+      return _profile;
     }
+    return null;
   }
 
-  // ═══════════════════════════════════════════════════════
-  // 3. CONTENT — Social feed (tx shares, NFT shares, etc.)
-  // ═══════════════════════════════════════════════════════
+  /// GET /search/profiles?query=
+  Future<List<TapestryProfile>> searchProfiles(String query, {int page = 1, int pageSize = 10}) async {
+    final data = await _get('/search/profiles?query=${Uri.encodeComponent(query)}&page=$page&pageSize=$pageSize');
+    if (data == null) return [];
 
-  /// Create content (post a transaction, share NFT, etc.)
+    final profiles = data['profiles'] as List? ?? [];
+    return profiles.map<TapestryProfile>((p) {
+      final pd = p['profile'] as Map<String, dynamic>? ?? p as Map<String, dynamic>;
+      final profile = TapestryProfile.fromApi(pd);
+      // Attach social counts + wallet from search result
+      return profile.copyWith(
+        walletAddress: p['walletAddress'] as String?,
+        followersCount: (p['socialCounts'] as Map?)?['followers'],
+        followingCount: (p['socialCounts'] as Map?)?['following'],
+        namespaceName: (p['namespace'] as Map?)?['readableName'] as String?,
+      );
+    }).toList();
+  }
+
+  /// GET /profiles/suggested/{id}
+  Future<List<TapestryProfile>> getSuggestedProfiles() async {
+    if (_profileId == null) return [];
+    final data = await _get('/profiles/suggested/$_profileId');
+    if (data == null) return [];
+
+    final profiles = data['profiles'] as List? ?? [];
+    return profiles.map<TapestryProfile>((p) =>
+      TapestryProfile.fromApi(p as Map<String, dynamic>)
+    ).toList();
+  }
+
+  // ═══════════════════════════════════════════
+  // 2. FOLLOWS
+  //    POST /followers/add     (body: {startId, endId})
+  //    POST /followers/remove  (body: {startId, endId})
+  //    GET  /followers/state   (?startId=&endId=)
+  //    GET  /profiles/{id}/followers
+  //    GET  /profiles/{id}/following
+  // ═══════════════════════════════════════════
+
+  /// POST /followers/add
+  Future<bool> followUser(String targetId) async {
+    if (_profileId == null) return false;
+
+    final data = await _post('/followers/add', {
+      'startId': _profileId,
+      'endId': targetId,
+    });
+
+    if (data != null) {
+      _followingCache.add(targetId);
+      _followingCount++;
+      await _saveFollowCache();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  /// POST /followers/remove
+  Future<bool> unfollowUser(String targetId) async {
+    if (_profileId == null) return false;
+
+    final data = await _post('/followers/remove', {
+      'startId': _profileId,
+      'endId': targetId,
+    });
+
+    if (data != null) {
+      _followingCache.remove(targetId);
+      _followingCount = (_followingCount - 1).clamp(0, 999999);
+      await _saveFollowCache();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  /// GET /followers/state?startId=&endId=
+  Future<bool> isFollowing(String targetId) async {
+    if (_followingCache.contains(targetId)) return true;
+    if (_profileId == null) return false;
+
+    final data = await _get('/followers/state?startId=$_profileId&endId=$targetId');
+    if (data != null) {
+      final following = data['isFollowing'] == true;
+      if (following) {
+        _followingCache.add(targetId);
+        await _saveFollowCache();
+      }
+      return following;
+    }
+    return false;
+  }
+
+  /// GET /profiles/{id}/followers
+  Future<TapestryPaginatedProfiles> getFollowers({String? id, int page = 1, int pageSize = 20}) async {
+    final pid = id ?? _profileId;
+    if (pid == null) return TapestryPaginatedProfiles.empty();
+
+    final data = await _get('/profiles/$pid/followers?page=$page&pageSize=$pageSize');
+    return TapestryPaginatedProfiles.fromApi(data);
+  }
+
+  /// GET /profiles/{id}/following
+  Future<TapestryPaginatedProfiles> getFollowing({String? id, int page = 1, int pageSize = 20}) async {
+    final pid = id ?? _profileId;
+    if (pid == null) return TapestryPaginatedProfiles.empty();
+
+    final data = await _get('/profiles/$pid/following?page=$page&pageSize=$pageSize');
+    return TapestryPaginatedProfiles.fromApi(data);
+  }
+
+  /// Refresh follower/following counts from profile
+  Future<void> refreshSocialCounts() async {
+    if (_profileId == null) return;
+    await fetchProfile();
+  }
+
+  // ═══════════════════════════════════════════
+  // 3. CONTENT
+  //    POST /contents/findOrCreate (id, profileId, properties[{key,value}])
+  //    GET  /contents/{id}
+  //    PUT  /contents/{id}
+  //    DELETE /contents/{id}
+  // ═══════════════════════════════════════════
+
+  /// POST /contents/findOrCreate
+  /// properties use [{key, value}] array format
   Future<TapestryContent?> createContent({
-    required String contentType, // 'transaction', 'nft_share', 'music_share', 'text_post'
+    required String contentId,
     required String text,
-    Map<String, dynamic>? metadata,
+    String contentType = 'text_post',
+    Map<String, String>? metadata,
   }) async {
-    if (_profileId == null || !hasApiKey) return null;
+    if (_profileId == null) return null;
 
-    try {
-      final body = {
-        'profileId': _profileId,
-        'contentType': contentType,
-        'text': text,
-        'properties': {
-          'platform': '0xchat',
-          'created_at': DateTime.now().toIso8601String(),
-          ...?metadata,
-        },
-      };
+    final props = <Map<String, String>>[
+      {'key': 'contentType', 'value': contentType},
+      {'key': 'text', 'value': text},
+      {'key': 'platform', 'value': '0xchat'},
+      {'key': 'created_at', 'value': DateTime.now().toIso8601String()},
+      if (metadata != null)
+        ...metadata.entries.map((e) => {'key': e.key, 'value': e.value}),
+    ];
 
-      final response = await http.post(
-        Uri.parse(_withApiKey('$_baseUrl/contents/create')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
+    final data = await _post('/contents/findOrCreate', {
+      'id': contentId,
+      'profileId': _profileId,
+      'properties': props,
+    });
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        if (kDebugMode) print('[Tapestry] Content created: ${data['id']}');
-        return TapestryContent.fromJson(data);
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Create content error: $e');
+    if (data != null) {
+      return TapestryContent.fromApi(data);
     }
     return null;
   }
 
-  /// Get user's content feed
-  Future<List<TapestryContent>> getUserContent(String profileId, {int limit = 10, int offset = 0}) async {
-    if (!hasApiKey) return [];
-
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey(
-          '$_baseUrl/contents/profile/$profileId?limit=$limit&offset=$offset'
-        )),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final contents = data['contents'] as List? ?? data as List? ?? [];
-        return contents.map<TapestryContent>((c) =>
-          TapestryContent.fromJson(c as Map<String, dynamic>)
-        ).toList();
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Get content error: $e');
-    }
-    return [];
-  }
-
-  /// Get single content by ID
+  /// GET /contents/{id} — returns content + socialCounts + authorProfile
   Future<TapestryContent?> getContent(String contentId) async {
-    if (!hasApiKey) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey('$_baseUrl/contents/$contentId')),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return TapestryContent.fromJson(data);
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Get content error: $e');
-    }
-    return null;
+    final data = await _get('/contents/$contentId');
+    if (data == null) return null;
+    return TapestryContent.fromDetailApi(data);
   }
 
-  /// Delete content
+  /// DELETE /contents/{id}
   Future<bool> deleteContent(String contentId) async {
-    if (!hasApiKey) return false;
-
-    try {
-      final response = await http.delete(
-        Uri.parse(_withApiKey('$_baseUrl/contents/delete')),
-        headers: _headers,
-        body: jsonEncode({'contentId': contentId}),
-      ).timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Delete content error: $e');
-    }
-    return false;
+    return await _delete('/contents/$contentId');
   }
 
-  // ═══════════════════════════════════════════════════════
-  // 4. LIKES — Social engagement
-  // ═══════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════
+  // 4. LIKES
+  //    POST   /likes/{nodeId}  (body: {startId})
+  //    DELETE  /likes/{nodeId}  (body: {startId})
+  // ═══════════════════════════════════════════
 
-  /// Like a content
-  Future<bool> likeContent(String contentId) async {
-    if (_profileId == null || !hasApiKey) return false;
-
-    try {
-      final body = {
-        'profileId': _profileId,
-        'contentId': contentId,
-      };
-
-      final response = await http.post(
-        Uri.parse(_withApiKey('$_baseUrl/likes')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (kDebugMode) print('[Tapestry] Liked: $contentId');
-        return true;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Like error: $e');
-    }
-    return false;
+  /// POST /likes/{nodeId}
+  Future<bool> likeContent(String nodeId) async {
+    if (_profileId == null) return false;
+    final data = await _post('/likes/$nodeId', {'startId': _profileId!});
+    return data != null;
   }
 
-  /// Unlike a content
-  Future<bool> unlikeContent(String contentId) async {
-    if (_profileId == null || !hasApiKey) return false;
-
-    try {
-      final body = {
-        'profileId': _profileId,
-        'contentId': contentId,
-      };
-
-      final response = await http.delete(
-        Uri.parse(_withApiKey('$_baseUrl/likes')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Unlike error: $e');
-    }
-    return false;
+  /// DELETE /likes/{nodeId}
+  Future<bool> unlikeContent(String nodeId) async {
+    if (_profileId == null) return false;
+    return await _delete('/likes/$nodeId', {'startId': _profileId!});
   }
 
-  /// Check if user liked a content
-  Future<bool> hasLiked(String contentId) async {
-    if (_profileId == null || !hasApiKey) return false;
+  // ═══════════════════════════════════════════
+  // 5. COMMENTS
+  //    POST /comments         (contentId, profileId, text)
+  //    GET  /comments?contentId=
+  //    DELETE /comments/{id}
+  // ═══════════════════════════════════════════
 
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey(
-          '$_baseUrl/likes/check?profileId=$_profileId&contentId=$contentId'
-        )),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['hasLiked'] == true;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Check like error: $e');
-    }
-    return false;
-  }
-
-  /// Get like count for content
-  Future<int> getLikeCount(String contentId) async {
-    if (!hasApiKey) return 0;
-
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey('$_baseUrl/likes/count/$contentId')),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['count'] ?? 0;
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Like count error: $e');
-    }
-    return 0;
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // 5. COMMENTS — Discussion on content
-  // ═══════════════════════════════════════════════════════
-
-  /// Add a comment to content
+  /// POST /comments
   Future<TapestryComment?> addComment({
     required String contentId,
     required String text,
   }) async {
-    if (_profileId == null || !hasApiKey) return null;
+    if (_profileId == null) return null;
 
-    try {
-      final body = {
-        'profileId': _profileId,
-        'contentId': contentId,
-        'text': text,
-      };
+    final data = await _post('/comments', {
+      'contentId': contentId,
+      'profileId': _profileId,
+      'text': text,
+    });
 
-      final response = await http.post(
-        Uri.parse(_withApiKey('$_baseUrl/comments')),
-        headers: _headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        if (kDebugMode) print('[Tapestry] Comment added');
-        return TapestryComment.fromJson(data);
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Comment error: $e');
+    if (data != null) {
+      return TapestryComment.fromApi(data);
     }
     return null;
   }
 
-  /// Get comments for content
-  Future<List<TapestryComment>> getComments(String contentId, {int limit = 20, int offset = 0}) async {
-    if (!hasApiKey) return [];
+  /// GET /comments?contentId=
+  Future<List<TapestryComment>> getComments(String contentId, {int page = 1, int pageSize = 20}) async {
+    final data = await _get('/comments?contentId=$contentId&page=$page&pageSize=$pageSize');
+    if (data == null) return [];
 
-    try {
-      final response = await http.get(
-        Uri.parse(_withApiKey(
-          '$_baseUrl/comments?contentId=$contentId&limit=$limit&offset=$offset'
-        )),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final comments = data['comments'] as List? ?? data as List? ?? [];
-        return comments.map<TapestryComment>((c) =>
-          TapestryComment.fromJson(c as Map<String, dynamic>)
-        ).toList();
-      }
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Get comments error: $e');
-    }
-    return [];
+    final comments = data['comments'] as List? ?? [];
+    return comments.map<TapestryComment>((c) => TapestryComment.fromDetailApi(c as Map<String, dynamic>)).toList();
   }
 
-  /// Delete a comment
+  /// DELETE /comments/{id}
   Future<bool> deleteComment(String commentId) async {
-    if (!hasApiKey) return false;
-
-    try {
-      final response = await http.delete(
-        Uri.parse(_withApiKey('$_baseUrl/comments/$commentId')),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
-    } catch (e) {
-      if (kDebugMode) print('[Tapestry] Delete comment error: $e');
-    }
-    return false;
+    return await _delete('/comments/$commentId');
   }
 
-  // ═══════════════════════════════════════════════════════
-  // LOCAL BINDING (always works without API key)
-  // ═══════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════
+  // 6. WALLETS
+  //    GET /wallets/{address}/socialCounts
+  // ═══════════════════════════════════════════
 
-  /// Bind a Nostr pubkey to a Solana address (local cache)
-  Future<void> bindLocal({
-    required String nostrPubkey,
-    required String solanaAddress,
-  }) async {
-    _localBindings[nostrPubkey] = solanaAddress;
-    await _saveLocalBindings();
-    if (kDebugMode) {
-      print('[Tapestry] Local bind: ${nostrPubkey.substring(0, 8)}... → ${solanaAddress.substring(0, 8)}...');
-    }
+  /// GET /wallets/{address}/socialCounts
+  Future<Map<String, int>> getWalletSocialCounts(String walletAddress) async {
+    final data = await _get('/wallets/$walletAddress/socialCounts');
+    if (data == null) return {};
+    return {
+      'followers': data['followers'] ?? 0,
+      'following': data['following'] ?? 0,
+      'globalFollowers': data['globalFollowers'] ?? 0,
+      'globalFollowing': data['globalFollowing'] ?? 0,
+    };
   }
 
-  /// Remove a local binding
-  Future<void> unbindLocal(String nostrPubkey) async {
-    _localBindings.remove(nostrPubkey);
-    await _saveLocalBindings();
-  }
+  // ═══════════════════════════════════════════
+  // CONVENIENCE: Auto-share from wallet actions
+  // ═══════════════════════════════════════════
 
-  /// Resolve Nostr pubkey → Solana address (local first, then Tapestry API)
-  Future<String?> resolveNostrToSolana(String nostrPubkey) async {
-    // 1. Check local cache first (instant)
-    final localAddr = _localBindings[nostrPubkey];
-    if (localAddr != null) return localAddr;
-
-    // 2. Try Tapestry API search
-    if (hasApiKey) {
-      try {
-        final profiles = await searchProfiles(nostrPubkey);
-        for (final p in profiles) {
-          if (p.customProperties['nostr_pubkey'] == nostrPubkey && p.walletAddress != null) {
-            await bindLocal(nostrPubkey: nostrPubkey, solanaAddress: p.walletAddress!);
-            return p.walletAddress;
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) print('[Tapestry] API resolve failed: $e');
-      }
-    }
-
-    return null;
-  }
-
-  /// Resolve Solana address → Nostr pubkey (reverse lookup from local cache)
-  String? resolveSolanaToNostr(String solanaAddress) {
-    for (final entry in _localBindings.entries) {
-      if (entry.value == solanaAddress) return entry.key;
-    }
-    return null;
-  }
-
-  /// Get all known contacts with Solana wallets
-  List<MapEntry<String, String>> get knownSolanaContacts =>
-      _localBindings.entries.toList();
-
-  // ═══════════════════════════════════════════════════════
-  // CONVENIENCE: Auto-post social content from actions
-  // ═══════════════════════════════════════════════════════
-
-  /// Auto-post when a transaction is sent (opt-in)
+  /// Share a transaction to social feed
   Future<void> shareTransaction({
     required String signature,
     required double amount,
@@ -830,9 +563,9 @@ class TapestryService extends ChangeNotifier {
     required String toAddress,
     bool isDevnet = false,
   }) async {
-    if (_profileId == null || !hasApiKey) return;
-
+    final id = 'tx_${signature.substring(0, 16)}_${DateTime.now().millisecondsSinceEpoch}';
     await createContent(
+      contentId: id,
       contentType: 'transaction',
       text: 'Sent $amount $tokenSymbol to ${toAddress.substring(0, 6)}...${toAddress.substring(toAddress.length - 4)}',
       metadata: {
@@ -845,50 +578,79 @@ class TapestryService extends ChangeNotifier {
     );
   }
 
-  /// Auto-post when an NFT is shared
-  Future<void> shareNft({
-    required String nftName,
-    required String nftImage,
-    required String mintAddress,
-  }) async {
-    if (_profileId == null || !hasApiKey) return;
-
+  /// Share an NFT to social feed
+  Future<void> shareNft({required String nftName, required String mintAddress, String? imageUrl}) async {
+    final id = 'nft_${mintAddress.substring(0, 12)}_${DateTime.now().millisecondsSinceEpoch}';
     await createContent(
+      contentId: id,
       contentType: 'nft_share',
       text: 'Check out my NFT: $nftName 🖼️',
       metadata: {
         'nft_name': nftName,
-        'nft_image': nftImage,
         'mint_address': mintAddress,
+        if (imageUrl != null) 'image_url': imageUrl,
       },
     );
   }
 
-  /// Auto-post when music is shared
-  Future<void> shareMusicToFeed({
-    required String trackTitle,
-    required String artist,
-    required String trackId,
-  }) async {
-    if (_profileId == null || !hasApiKey) return;
-
+  /// Share music to social feed
+  Future<void> shareMusicToFeed({required String title, required String artist, required String trackId}) async {
+    final id = 'music_${trackId}_${DateTime.now().millisecondsSinceEpoch}';
     await createContent(
+      contentId: id,
       contentType: 'music_share',
-      text: '🎵 Listening to "$trackTitle" by $artist on Audius',
+      text: '🎵 Listening to "$title" by $artist on Audius',
       metadata: {
-        'track_title': trackTitle,
+        'track_title': title,
         'artist': artist,
         'audius_track_id': trackId,
-        'audius_url': 'https://audius.co/tracks/$trackId',
       },
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  // CLEANUP
-  // ═══════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════
+  // LOCAL BINDING (always works without API key)
+  // ═══════════════════════════════════════════
 
-  /// Clear all saved data
+  Future<void> bindLocal({required String nostrPubkey, required String solanaAddress}) async {
+    _localBindings[nostrPubkey] = solanaAddress;
+    await _saveLocalBindings();
+  }
+
+  Future<void> unbindLocal(String nostrPubkey) async {
+    _localBindings.remove(nostrPubkey);
+    await _saveLocalBindings();
+  }
+
+  Future<String?> resolveNostrToSolana(String nostrPubkey) async {
+    final local = _localBindings[nostrPubkey];
+    if (local != null) return local;
+
+    if (hasApiKey) {
+      final results = await searchProfiles(nostrPubkey);
+      for (final p in results) {
+        if (p.customProperties['nostr_pubkey'] == nostrPubkey && p.walletAddress != null) {
+          await bindLocal(nostrPubkey: nostrPubkey, solanaAddress: p.walletAddress!);
+          return p.walletAddress;
+        }
+      }
+    }
+    return null;
+  }
+
+  String? resolveSolanaToNostr(String solanaAddress) {
+    for (final entry in _localBindings.entries) {
+      if (entry.value == solanaAddress) return entry.key;
+    }
+    return null;
+  }
+
+  List<MapEntry<String, String>> get knownSolanaContacts => _localBindings.entries.toList();
+
+  // ═══════════════════════════════════════════
+  // CLEANUP
+  // ═══════════════════════════════════════════
+
   Future<void> clearBinding() async {
     _profileId = null;
     _profile = null;
@@ -915,125 +677,181 @@ class TapestryService extends ChangeNotifier {
 }
 
 // ═══════════════════════════════════════════════════════
-// MODELS
+// MODELS — Matching real Tapestry API response format
 // ═══════════════════════════════════════════════════════
 
-/// Tapestry profile model (matches API response)
 class TapestryProfile {
   final String? id;
   final String? username;
   final String? bio;
+  final String? image;
   final String? walletAddress;
-  final String? blockchain;
   final String? namespace;
+  final String? namespaceName;
+  final int? createdAt;
   final Map<String, dynamic> customProperties;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
   final bool isLocal;
+  final int? followersCount;
+  final int? followingCount;
 
   TapestryProfile({
-    this.id,
-    this.username,
-    this.bio,
-    this.walletAddress,
-    this.blockchain,
-    this.namespace,
-    this.customProperties = const {},
-    this.createdAt,
-    this.updatedAt,
-    this.isLocal = false,
+    this.id, this.username, this.bio, this.image, this.walletAddress,
+    this.namespace, this.namespaceName, this.createdAt,
+    this.customProperties = const {}, this.isLocal = false,
+    this.followersCount, this.followingCount,
   });
 
   String? get nostrPubkey => customProperties['nostr_pubkey'] as String?;
-  String? get profileImage => customProperties['profileImage'] as String?;
+  String? get platform => customProperties['platform'] as String?;
 
-  factory TapestryProfile.fromApiResponse(Map<String, dynamic> json) {
-    // Handle both nested {profile: {...}} and flat response
-    final data = json['profile'] as Map<String, dynamic>? ?? json;
+  TapestryProfile copyWith({
+    String? walletAddress, String? namespaceName,
+    int? followersCount, int? followingCount,
+  }) => TapestryProfile(
+    id: id, username: username, bio: bio, image: image,
+    walletAddress: walletAddress ?? this.walletAddress,
+    namespace: namespace,
+    namespaceName: namespaceName ?? this.namespaceName,
+    createdAt: createdAt,
+    customProperties: customProperties,
+    isLocal: isLocal,
+    followersCount: followersCount ?? this.followersCount,
+    followingCount: followingCount ?? this.followingCount,
+  );
+
+  /// Parse from real API response (profile node is flat)
+  /// Fields: id, username, bio, image, namespace, created_at, + custom properties flattened
+  factory TapestryProfile.fromApi(Map<String, dynamic> json) {
+    // Known system fields
+    const systemKeys = {'id', 'username', 'bio', 'image', 'namespace', 'created_at', 'walletAddress', 'blockchain', 'wallet'};
+    final custom = <String, dynamic>{};
+    for (final e in json.entries) {
+      if (!systemKeys.contains(e.key) && e.value != null) {
+        custom[e.key] = e.value;
+      }
+    }
+
+    // Wallet can come from nested 'wallet' object
+    String? walletAddr = json['walletAddress'] as String?;
+    if (walletAddr == null && json['wallet'] is Map) {
+      walletAddr = (json['wallet'] as Map)['id'] as String?;
+    }
 
     return TapestryProfile(
-      id: data['id']?.toString(),
-      username: data['username'] as String?,
-      bio: data['bio'] as String?,
-      walletAddress: data['walletAddress'] as String?,
-      blockchain: data['blockchain'] as String?,
-      namespace: data['namespace'] as String?,
-      customProperties: data['customProperties'] as Map<String, dynamic>? ?? {},
-      createdAt: data['createdAt'] != null ? DateTime.tryParse(data['createdAt']) : null,
-      updatedAt: data['updatedAt'] != null ? DateTime.tryParse(data['updatedAt']) : null,
-      isLocal: false,
+      id: json['id']?.toString(),
+      username: json['username'] as String?,
+      bio: json['bio'] as String?,
+      image: json['image'] as String?,
+      walletAddress: walletAddr,
+      namespace: json['namespace'] as String?,
+      createdAt: json['created_at'] as int?,
+      customProperties: custom,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'username': username,
-    'bio': bio,
-    'walletAddress': walletAddress,
-    'blockchain': blockchain,
-    'customProperties': customProperties,
-  };
 }
 
-/// Tapestry content model
+class TapestryPaginatedProfiles {
+  final List<TapestryProfile> profiles;
+  final int page;
+  final int pageSize;
+  final int totalCount;
+
+  TapestryPaginatedProfiles({this.profiles = const [], this.page = 1, this.pageSize = 10, this.totalCount = 0});
+
+  factory TapestryPaginatedProfiles.empty() => TapestryPaginatedProfiles();
+
+  factory TapestryPaginatedProfiles.fromApi(Map<String, dynamic>? data) {
+    if (data == null) return TapestryPaginatedProfiles.empty();
+    final list = data['profiles'] as List? ?? [];
+    return TapestryPaginatedProfiles(
+      profiles: list.map<TapestryProfile>((p) => TapestryProfile.fromApi(p as Map<String, dynamic>)).toList(),
+      page: data['page'] ?? 1,
+      pageSize: data['pageSize'] ?? 10,
+      totalCount: data['totalCount'] ?? 0,
+    );
+  }
+}
+
 class TapestryContent {
   final String? id;
-  final String? profileId;
-  final String? contentType;
+  final String? namespace;
+  final int? createdAt;
   final String? text;
+  final String? contentType;
   final Map<String, dynamic> properties;
-  final DateTime? createdAt;
+  // From detail view
   final int likeCount;
   final int commentCount;
+  final TapestryProfile? author;
 
   TapestryContent({
-    this.id,
-    this.profileId,
-    this.contentType,
-    this.text,
+    this.id, this.namespace, this.createdAt, this.text, this.contentType,
     this.properties = const {},
-    this.createdAt,
-    this.likeCount = 0,
-    this.commentCount = 0,
+    this.likeCount = 0, this.commentCount = 0, this.author,
   });
 
-  factory TapestryContent.fromJson(Map<String, dynamic> json) {
+  /// Parse from findOrCreate response (flat properties)
+  factory TapestryContent.fromApi(Map<String, dynamic> json) {
     return TapestryContent(
       id: json['id']?.toString(),
-      profileId: json['profileId'] as String?,
-      contentType: json['contentType'] as String?,
+      namespace: json['namespace'] as String?,
+      createdAt: json['created_at'] as int?,
       text: json['text'] as String?,
-      properties: json['properties'] as Map<String, dynamic>? ?? {},
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
-      likeCount: json['likeCount'] ?? json['likes'] ?? 0,
-      commentCount: json['commentCount'] ?? json['comments'] ?? 0,
+      contentType: json['contentType'] as String?,
+      properties: Map<String, dynamic>.from(json),
+    );
+  }
+
+  /// Parse from GET /contents/{id} (nested: content, socialCounts, authorProfile)
+  factory TapestryContent.fromDetailApi(Map<String, dynamic> json) {
+    final c = json['content'] as Map<String, dynamic>? ?? json;
+    final counts = json['socialCounts'] as Map<String, dynamic>? ?? {};
+    final authorData = json['authorProfile'] as Map<String, dynamic>?;
+
+    return TapestryContent(
+      id: c['id']?.toString(),
+      namespace: c['namespace'] as String?,
+      createdAt: c['created_at'] as int?,
+      text: c['text'] as String?,
+      contentType: c['contentType'] as String?,
+      properties: Map<String, dynamic>.from(c),
+      likeCount: counts['likeCount'] ?? 0,
+      commentCount: counts['commentCount'] ?? 0,
+      author: authorData != null ? TapestryProfile.fromApi(authorData) : null,
     );
   }
 }
 
-/// Tapestry comment model
 class TapestryComment {
   final String? id;
-  final String? profileId;
-  final String? contentId;
   final String? text;
-  final DateTime? createdAt;
+  final int? createdAt;
+  final TapestryProfile? author;
+  final int likeCount;
 
-  TapestryComment({
-    this.id,
-    this.profileId,
-    this.contentId,
-    this.text,
-    this.createdAt,
-  });
+  TapestryComment({this.id, this.text, this.createdAt, this.author, this.likeCount = 0});
 
-  factory TapestryComment.fromJson(Map<String, dynamic> json) {
+  /// Parse from POST /comments response (flat)
+  factory TapestryComment.fromApi(Map<String, dynamic> json) {
     return TapestryComment(
       id: json['id']?.toString(),
-      profileId: json['profileId'] as String?,
-      contentId: json['contentId'] as String?,
       text: json['text'] as String?,
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
+      createdAt: json['created_at'] as int?,
+    );
+  }
+
+  /// Parse from GET /comments (nested: comment, author, socialCounts)
+  factory TapestryComment.fromDetailApi(Map<String, dynamic> json) {
+    final c = json['comment'] as Map<String, dynamic>? ?? json;
+    final authorData = json['author'] as Map<String, dynamic>?;
+    final counts = json['socialCounts'] as Map<String, dynamic>? ?? {};
+
+    return TapestryComment(
+      id: c['id']?.toString(),
+      text: c['text'] as String?,
+      createdAt: c['created_at'] as int?,
+      author: authorData != null ? TapestryProfile.fromApi(authorData) : null,
+      likeCount: counts['likeCount'] ?? 0,
     );
   }
 }

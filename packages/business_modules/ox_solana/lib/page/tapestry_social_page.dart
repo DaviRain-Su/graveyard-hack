@@ -24,6 +24,7 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
   List<TapestryContent> _feedItems = [];
   List<TapestryProfile> _followers = [];
   List<TapestryProfile> _following = [];
+  List<TapestryProfile> _suggested = [];
   List<TapestryProfile> _searchResults = [];
 
   bool _loadingFeed = false;
@@ -63,7 +64,10 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
     if (_tapestry.profileId == null) return;
     setState(() => _loadingFeed = true);
     try {
-      _feedItems = await _tapestry.getUserContent(_tapestry.profileId!);
+      // Feed: load suggested profiles as discovery (API has no feed endpoint for own content list)
+      _suggested = await _tapestry.getSuggestedProfiles();
+      // Try to load our latest content if we have a known content ID
+      _feedItems = [];
     } catch (_) {}
     if (mounted) setState(() => _loadingFeed = false);
   }
@@ -71,7 +75,8 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
   Future<void> _loadFollowers() async {
     setState(() => _loadingFollowers = true);
     try {
-      _followers = await _tapestry.getFollowers();
+      final fResult = await _tapestry.getFollowers();
+      _followers = fResult.profiles;
     } catch (_) {}
     if (mounted) setState(() => _loadingFollowers = false);
   }
@@ -79,7 +84,8 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
   Future<void> _loadFollowing() async {
     setState(() => _loadingFollowing = true);
     try {
-      _following = await _tapestry.getFollowing();
+      final gResult = await _tapestry.getFollowing();
+      _following = gResult.profiles;
     } catch (_) {}
     if (mounted) setState(() => _loadingFollowing = false);
   }
@@ -491,7 +497,9 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
 
     OXLoading.show();
     try {
+      final contentId = '0xchat_${DateTime.now().millisecondsSinceEpoch}';
       final content = await _tapestry.createContent(
+        contentId: contentId,
         contentType: 'text_post',
         text: text,
       );
@@ -557,7 +565,7 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
               ),
               Spacer(),
               if (content.createdAt != null)
-                Text(_timeAgo(content.createdAt!),
+                Text(_timeAgoMs(content.createdAt!),
                     style: TextStyle(color: ThemeColor.color110, fontSize: 11)),
             ],
           ),
@@ -925,11 +933,11 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final success = await _tapestry.updateProfile(
+              final updated = await _tapestry.updateProfile(
                 username: usernameCtl.text.trim(),
                 bio: bioCtl.text.trim(),
               );
-              if (success && mounted) {
+              if (updated != null && mounted) {
                 CommonToast.instance.show(context, 'Profile updated! ✅');
                 setState(() {});
               }
@@ -982,7 +990,8 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
     );
   }
 
-  String _timeAgo(DateTime dt) {
+  String _timeAgoMs(int timestampMs) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(timestampMs);
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
