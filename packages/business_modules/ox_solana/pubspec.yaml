@@ -27,6 +27,7 @@ dependencies:
 
   # QR code
   qr_flutter: ^4.1.0
+  mobile_scanner: ^7.0.0
   http: ^1.2.0
   flutter_secure_storage: ^9.2.4
   pretty_qr_code: ^2.0.3

@@ -112,19 +112,31 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
             ),
             child: Row(
               children: [
-                // Status icon
+                // Status icon — direction-aware
                 Container(
                   width: Adapt.px(40),
                   height: Adapt.px(40),
                   decoration: BoxDecoration(
                     color: tx.isError
                         ? Colors.red.withOpacity(0.15)
-                        : const Color(0xFF14F195).withOpacity(0.15),
+                        : tx.isSend
+                            ? const Color(0xFF9945FF).withOpacity(0.15)
+                            : const Color(0xFF14F195).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
-                    tx.isError ? Icons.error_outline : Icons.check_circle_outline,
-                    color: tx.isError ? Colors.red[400] : const Color(0xFF14F195),
+                    tx.isError
+                        ? Icons.error_outline
+                        : tx.isSend
+                            ? Icons.arrow_upward
+                            : tx.isReceive
+                                ? Icons.arrow_downward
+                                : Icons.swap_horiz,
+                    color: tx.isError
+                        ? Colors.red[400]
+                        : tx.isSend
+                            ? const Color(0xFF9945FF)
+                            : const Color(0xFF14F195),
                     size: 22,
                   ),
                 ),
@@ -136,11 +148,16 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        tx.shortSignature,
+                        tx.isError
+                            ? 'Failed'
+                            : tx.isSend
+                                ? 'Sent'
+                                : tx.isReceive
+                                    ? 'Received'
+                                    : tx.shortSignature,
                         style: TextStyle(
                           color: ThemeColor.color0,
                           fontSize: 14,
-                          fontFamily: 'monospace',
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -156,23 +173,49 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                   ),
                 ),
 
-                // Status badge
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: tx.isError
-                        ? Colors.red.withOpacity(0.15)
-                        : const Color(0xFF14F195).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    tx.statusDisplay,
-                    style: TextStyle(
-                      color: tx.isError ? Colors.red[400] : const Color(0xFF14F195),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                // Amount or status
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (tx.amountDisplay.isNotEmpty)
+                      Text(
+                        tx.amountDisplay,
+                        style: TextStyle(
+                          color: tx.isError
+                              ? Colors.red[400]
+                              : tx.isSend
+                                  ? const Color(0xFF9945FF)
+                                  : const Color(0xFF14F195),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: tx.isError
+                              ? Colors.red.withOpacity(0.15)
+                              : const Color(0xFF14F195).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          tx.statusDisplay,
+                          style: TextStyle(
+                            color: tx.isError ? Colors.red[400] : const Color(0xFF14F195),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    if (tx.fee != null) ...[
+                      SizedBox(height: 2),
+                      Text(
+                        'Fee: ${tx.fee!.toStringAsFixed(6)}',
+                        style: TextStyle(color: ThemeColor.color110, fontSize: 10),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -229,6 +272,18 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
             // Slot
             _buildDetailRow('Slot', tx.slot.toString()),
             SizedBox(height: 12),
+
+            // Amount
+            if (tx.solChange != null) ...[
+              _buildDetailRow('Amount', tx.amountDisplay),
+              SizedBox(height: 12),
+            ],
+
+            // Fee
+            if (tx.fee != null) ...[
+              _buildDetailRow('Fee', '${tx.fee!.toStringAsFixed(6)} SOL'),
+              SizedBox(height: 12),
+            ],
 
             // Status
             _buildDetailRow('Status', tx.statusDisplay),

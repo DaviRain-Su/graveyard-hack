@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
@@ -78,7 +79,30 @@ class _SendTokenPageState extends State<SendTokenPage> {
             SizedBox(height: Adapt.px(20)),
 
             // Recipient address
-            Text('Recipient Address', style: TextStyle(color: ThemeColor.color100, fontSize: 14)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Recipient Address', style: TextStyle(color: ThemeColor.color100, fontSize: 14)),
+                GestureDetector(
+                  onTap: () async {
+                    final data = await Clipboard.getData(Clipboard.kTextPlain);
+                    if (data?.text != null && data!.text!.isNotEmpty) {
+                      final text = data.text!.trim();
+                      _addressController.text = text.startsWith('solana:') ? text.substring(7).split('?').first : text;
+                      CommonToast.instance.show(context, 'Address pasted');
+                    }
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.paste, size: 14, color: const Color(0xFF9945FF)),
+                      SizedBox(width: 4),
+                      Text('Paste', style: TextStyle(color: const Color(0xFF9945FF), fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             SizedBox(height: 8),
             TextField(
               controller: _addressController,

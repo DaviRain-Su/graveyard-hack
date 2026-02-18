@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_common/widgets/common_loading.dart';
+
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../services/solana_wallet_service.dart';
 
@@ -71,8 +74,24 @@ class _SendSolPageState extends State<SendSolPage> {
             SizedBox(height: Adapt.px(20)),
 
             // Recipient address
-            Text('Recipient Address',
-                style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Recipient Address',
+                    style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+                GestureDetector(
+                  onTap: _pasteFromClipboard,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.paste, size: 14, color: const Color(0xFF9945FF)),
+                      SizedBox(width: 4),
+                      Text('Paste', style: TextStyle(color: const Color(0xFF9945FF), fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             SizedBox(height: 8),
             TextField(
               controller: _addressController,
@@ -85,6 +104,11 @@ class _SendSolPageState extends State<SendSolPage> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
+                ),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.qr_code_scanner, color: ThemeColor.color100),
+                  onPressed: _scanQrCode,
+                  tooltip: 'Scan QR Code',
                 ),
               ),
             ),
@@ -155,6 +179,41 @@ class _SendSolPageState extends State<SendSolPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null && data!.text!.isNotEmpty) {
+      final text = data.text!.trim();
+      // Handle solana: URI scheme
+      final addr = text.startsWith('solana:') ? text.substring(7).split('?').first : text;
+      _addressController.text = addr;
+      if (mounted) {
+        CommonToast.instance.show(context, 'Address pasted');
+      }
+    } else {
+      if (mounted) {
+        CommonToast.instance.show(context, 'Clipboard is empty');
+      }
+    }
+  }
+
+  Future<void> _scanQrCode() async {
+    // On mobile: use mobile_scanner. On desktop: show paste hint.
+    try {
+      final result = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(builder: (_) => const _QrScannerPage()),
+      );
+      if (result != null && result.isNotEmpty) {
+        final addr = result.startsWith('solana:') ? result.substring(7).split('?').first : result;
+        _addressController.text = addr;
+      }
+    } catch (e) {
+      if (mounted) {
+        CommonToast.instance.show(context, 'Scanner not available on this platform. Use Paste instead.');
+      }
+    }
   }
 
   Future<void> _sendSol() async {
@@ -248,5 +307,55 @@ class _SendSolPageState extends State<SendSolPage> {
     } finally {
       setState(() => _isSending = false);
     }
+  }
+}
+
+/// Simple QR scanner page using mobile_scanner
+class _QrScannerPage extends StatefulWidget {
+  const _QrScannerPage();
+
+  @override
+  State<_QrScannerPage> createState() => _QrScannerPageState();
+}
+
+class _QrScannerPageState extends State<_QrScannerPage> {
+  bool _scanned = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Scan QR Code'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: MobileScanner(
+        onDetect: (capture) {
+          if (_scanned) return;
+          final barcodes = capture.barcodes;
+          for (final barcode in barcodes) {
+            final value = barcode.rawValue;
+            if (value != null && value.isNotEmpty) {
+              _scanned = true;
+              Navigator.pop(context, value);
+              return;
+            }
+          }
+        },
+        overlayBuilder: (context, constraints) {
+          return Center(
+            child: Container(
+              width: constraints.maxWidth * 0.7,
+              height: constraints.maxWidth * 0.7,
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFF9945FF), width: 3),
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

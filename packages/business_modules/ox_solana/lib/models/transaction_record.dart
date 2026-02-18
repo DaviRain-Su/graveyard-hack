@@ -7,6 +7,13 @@ class TransactionRecord {
   final String? memo;
   final String? confirmationStatus;
 
+  /// SOL amount change for our wallet (negative = sent, positive = received)
+  /// null if not yet resolved via getTransaction
+  final double? solChange;
+
+  /// Fee paid in SOL
+  final double? fee;
+
   const TransactionRecord({
     required this.signature,
     required this.slot,
@@ -14,7 +21,35 @@ class TransactionRecord {
     this.isError = false,
     this.memo,
     this.confirmationStatus,
+    this.solChange,
+    this.fee,
   });
+
+  /// Copy with resolved amount data
+  TransactionRecord withAmounts({double? solChange, double? fee}) {
+    return TransactionRecord(
+      signature: signature,
+      slot: slot,
+      blockTime: blockTime,
+      isError: isError,
+      memo: memo,
+      confirmationStatus: confirmationStatus,
+      solChange: solChange ?? this.solChange,
+      fee: fee ?? this.fee,
+    );
+  }
+
+  /// Whether this is a send or receive
+  bool get isSend => (solChange ?? 0) < 0;
+  bool get isReceive => (solChange ?? 0) > 0;
+
+  /// Formatted amount display
+  String get amountDisplay {
+    if (solChange == null) return '';
+    final abs = solChange!.abs();
+    final sign = solChange! >= 0 ? '+' : '-';
+    return '$sign${abs.toStringAsFixed(4)} SOL';
+  }
 
   String get shortSignature =>
       '${signature.substring(0, 8)}...${signature.substring(signature.length - 8)}';

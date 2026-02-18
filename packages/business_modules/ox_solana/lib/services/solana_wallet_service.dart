@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:solana/solana.dart';
 import 'package:solana/dto.dart' hide Account;
+import 'package:solana/src/rpc/dto/transaction.dart' as sol_tx;
 import 'package:bip39/bip39.dart' as bip39;
 import 'package:ox_common/utils/storage_key_tool.dart';
 import 'package:chatcore/chat-core.dart';
@@ -347,7 +348,7 @@ class SolanaWalletService extends ChangeNotifier {
   bool _isLoadingHistory = false;
   bool get isLoadingHistory => _isLoadingHistory;
 
-  /// Fetch recent transaction signatures
+  /// Fetch recent transaction signatures, then resolve amounts in background
   Future<List<TransactionRecord>> fetchHistory({int limit = 20}) async {
     if (_keyPair == null || _client == null) return [];
 
@@ -370,19 +371,68 @@ class SolanaWalletService extends ChangeNotifier {
       )).toList();
 
       _error = null;
+      _isLoadingHistory = false;
+      notifyListeners();
 
       if (kDebugMode) {
         print('[OXSolana] Fetched ${_history.length} transactions');
       }
 
+      // Resolve amounts in background (don't block UI)
+      _resolveTransactionAmounts();
+
       return _history;
     } catch (e) {
       if (kDebugMode) print('[OXSolana] Fetch history error: $e');
       _error = 'Failed to fetch history: $e';
-      return _history;
-    } finally {
       _isLoadingHistory = false;
       notifyListeners();
+      return _history;
+    }
+  }
+
+  /// Resolve SOL amounts for each transaction via getTransaction
+  Future<void> _resolveTransactionAmounts() async {
+    if (_client == null || _history.isEmpty) return;
+
+    final myAddress = address;
+    for (int i = 0; i < _history.length; i++) {
+      final tx = _history[i];
+      if (tx.solChange != null) continue; // already resolved
+      if (tx.isError) continue; // skip failed
+
+      try {
+        final details = await _client!.rpcClient.getTransaction(
+          tx.signature,
+          encoding: Encoding.jsonParsed,
+        );
+
+        if (details?.meta != null) {
+          final transaction = details!.transaction;
+          List<String> pubkeys = [];
+
+          if (transaction is sol_tx.ParsedTransaction) {
+            pubkeys = transaction.message.accountKeys.map((k) => k.pubkey).toList();
+          }
+
+          // Find our account index
+          int myIndex = pubkeys.indexOf(myAddress);
+
+          if (myIndex >= 0 &&
+              myIndex < details.meta!.preBalances.length &&
+              myIndex < details.meta!.postBalances.length) {
+            final pre = details.meta!.preBalances[myIndex];
+            final post = details.meta!.postBalances[myIndex];
+            final change = (post - pre) / lamportsPerSol;
+            final fee = details.meta!.fee / lamportsPerSol;
+
+            _history[i] = tx.withAmounts(solChange: change, fee: fee);
+            notifyListeners(); // Update UI progressively
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) print('[OXSolana] Resolve tx[$i] error: $e');
+      }
     }
   }
 
