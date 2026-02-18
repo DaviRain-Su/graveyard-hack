@@ -64,10 +64,10 @@ class _TapestrySocialPageState extends State<TapestrySocialPage> with SingleTick
     if (_tapestry.profileId == null) return;
     setState(() => _loadingFeed = true);
     try {
-      // Feed: load suggested profiles as discovery (API has no feed endpoint for own content list)
+      // Load my posted content from local cache of content IDs
+      _feedItems = await _tapestry.getMyFeed(limit: 20);
+      // Also load suggested profiles
       _suggested = await _tapestry.getSuggestedProfiles();
-      // Try to load our latest content if we have a known content ID
-      _feedItems = [];
     } catch (_) {}
     if (mounted) setState(() => _loadingFeed = false);
   }

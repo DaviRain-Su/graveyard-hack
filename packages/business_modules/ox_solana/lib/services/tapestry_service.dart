@@ -30,6 +30,7 @@ class TapestryService extends ChangeNotifier {
   static const String _localBindingsKey = 'ox_solana_local_bindings';
   static const String _apiKeyStorageKey = 'ox_solana_tapestry_api_key';
   static const String _followCacheKey = 'ox_solana_tapestry_follows';
+  static const String _contentIdsKey = 'ox_solana_tapestry_content_ids';
 
   String? _apiKey;
   bool get hasApiKey => _apiKey != null && _apiKey!.isNotEmpty;
@@ -50,6 +51,10 @@ class TapestryService extends ChangeNotifier {
 
   Set<String> _followingCache = {};
   bool isFollowingCached(String profileId) => _followingCache.contains(profileId);
+
+  /// Local cache of content IDs we created (for feed reconstruction)
+  List<String> _myContentIds = [];
+  List<String> get myContentIds => List.unmodifiable(_myContentIds);
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -79,6 +84,15 @@ class TapestryService extends ChangeNotifier {
         _followingCache = Set<String>.from(jsonDecode(followJson));
       } catch (_) {
         _followingCache = {};
+      }
+    }
+
+    final contentIdsJson = prefs.getString(_contentIdsKey);
+    if (contentIdsJson != null) {
+      try {
+        _myContentIds = List<String>.from(jsonDecode(contentIdsJson));
+      } catch (_) {
+        _myContentIds = [];
       }
     }
 
@@ -458,6 +472,13 @@ class TapestryService extends ChangeNotifier {
     });
 
     if (data != null) {
+      // Cache content ID locally for feed reconstruction
+      if (!_myContentIds.contains(contentId)) {
+        _myContentIds.insert(0, contentId);
+        // Keep max 100
+        if (_myContentIds.length > 100) _myContentIds = _myContentIds.sublist(0, 100);
+        _saveContentIds();
+      }
       return TapestryContent.fromApi(data);
     }
     return null;
@@ -472,7 +493,37 @@ class TapestryService extends ChangeNotifier {
 
   /// DELETE /contents/{id}
   Future<bool> deleteContent(String contentId) async {
-    return await _delete('/contents/$contentId');
+    final ok = await _delete('/contents/$contentId');
+    if (ok) {
+      _myContentIds.remove(contentId);
+      _saveContentIds();
+    }
+    return ok;
+  }
+
+  /// Load my feed by fetching cached content IDs from API
+  /// Returns latest [limit] items, fetched in parallel
+  Future<List<TapestryContent>> getMyFeed({int limit = 20}) async {
+    if (_myContentIds.isEmpty) return [];
+
+    final ids = _myContentIds.take(limit).toList();
+    final results = <TapestryContent>[];
+
+    // Fetch in parallel batches of 5
+    for (var i = 0; i < ids.length; i += 5) {
+      final batch = ids.sublist(i, (i + 5).clamp(0, ids.length));
+      final futures = batch.map((id) => getContent(id));
+      final contents = await Future.wait(futures);
+      for (final c in contents) {
+        if (c != null) results.add(c);
+      }
+    }
+    return results;
+  }
+
+  Future<void> _saveContentIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_contentIdsKey, jsonEncode(_myContentIds));
   }
 
   // ═══════════════════════════════════════════
@@ -658,10 +709,12 @@ class TapestryService extends ChangeNotifier {
     _followingCount = 0;
     _localBindings.clear();
     _followingCache.clear();
+    _myContentIds.clear();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
     await prefs.remove(_localBindingsKey);
     await prefs.remove(_followCacheKey);
+    await prefs.remove(_contentIdsKey);
     notifyListeners();
   }
 
