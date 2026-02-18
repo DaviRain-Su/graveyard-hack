@@ -15,6 +15,10 @@ import 'page/transaction_history_page.dart';
 import 'page/swap_page.dart';
 import 'page/red_packet_page.dart';
 import 'page/audius_page.dart';
+import 'page/nft_gallery_page.dart';
+import 'page/dapp_connect_page.dart';
+import 'services/nft_service.dart';
+import 'services/dapp_connect_service.dart';
 import 'services/chat_transfer_service.dart';
 
 class OXSolana extends OXFlutterModule {
@@ -31,6 +35,7 @@ class OXSolana extends OXFlutterModule {
     await SolanaWalletService.instance.init();
     await TapestryService.instance.init();
     await RedPacketService.instance.init();
+    await DappConnectService.instance.init();
     // Pre-fetch token prices (non-blocking)
     PriceService.instance.fetchPrices();
   }
@@ -69,6 +74,10 @@ class OXSolana extends OXFlutterModule {
             (ctx) => AudiusPage(
                   onTrackSelected: params?['onTrackSelected'],
                 ));
+      case 'NftGalleryPage':
+        return OXNavigator.pushPage(context, (ctx) => const NftGalleryPage());
+      case 'DappConnectPage':
+        return OXNavigator.pushPage(context, (ctx) => const DappConnectPage());
     }
     return null;
   }

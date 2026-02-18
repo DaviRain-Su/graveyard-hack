@@ -15,6 +15,8 @@ import 'receive_page.dart';
 import 'transaction_history_page.dart';
 import 'swap_page.dart';
 import 'audius_page.dart';
+import 'nft_gallery_page.dart';
+import 'dapp_connect_page.dart';
 
 /// Main Solana wallet page — shows balance, address, and action buttons
 class SolanaWalletPage extends StatefulWidget {
@@ -209,8 +211,12 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
           _buildExplorerLink(),
           SizedBox(height: Adapt.px(16)),
 
-          // Audius music shortcut
+          // Discover section
+          _buildNftShortcut(),
+          SizedBox(height: Adapt.px(10)),
           _buildAudiusShortcut(),
+          SizedBox(height: Adapt.px(10)),
+          _buildDappConnectShortcut(),
           SizedBox(height: Adapt.px(16)),
 
           // Nostr binding info
@@ -816,6 +822,96 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               ),
             ),
             Icon(Icons.copy, size: 16, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDappConnectShortcut() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DappConnectPage()),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF3498DB).withOpacity(0.15), Color(0xFF2ECC71).withOpacity(0.1)],
+          ),
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: Color(0xFF3498DB).withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Color(0xFF3498DB).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(child: Text('🔗', style: TextStyle(fontSize: 18))),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('DApp Connect',
+                      style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('Connect to Solana dApps & sign transactions',
+                      style: TextStyle(color: ThemeColor.color100, fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNftShortcut() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const NftGalleryPage()),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF9945FF).withOpacity(0.15), Color(0xFF14F195).withOpacity(0.1)],
+          ),
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: Color(0xFF9945FF).withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Color(0xFF9945FF).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(child: Text('🖼️', style: TextStyle(fontSize: 18))),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('NFT Gallery',
+                      style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('View your Solana NFT collection',
+                      style: TextStyle(color: ThemeColor.color100, fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ThemeColor.color100),
           ],
         ),
       ),
