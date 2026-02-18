@@ -59,7 +59,7 @@ class _HomeTabBarPageState extends State<HomeTabBarPage> with OXUserInfoObserver
     WidgetsBinding.instance.addObserver(this);
 
     // Default to move to tabbar mode: always show 4 tabs (home, contact, discover, me)
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
     _pageController = PageController(initialPage: 0);
     tabViewInfo = TabViewInfo.getTabViewData(_typeList);
     Localized.addLocaleChangedCallback(onLocaleChange);
@@ -223,7 +223,7 @@ class _HomeTabBarPageState extends State<HomeTabBarPage> with OXUserInfoObserver
   }
 
   void _applyTabbarMode({int targetIndex = 0}) {
-    final List<HomeTabBarType> targetList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
+    final List<HomeTabBarType> targetList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
     setState(() {
       _typeList = targetList;
       tabViewInfo = TabViewInfo.getTabViewData(_typeList);

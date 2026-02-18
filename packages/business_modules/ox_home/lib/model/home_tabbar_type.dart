@@ -7,6 +7,7 @@ enum HomeTabBarType {
   contact,
   home,
   discover,
+  wallet,
   me,
 }
 
@@ -20,6 +21,8 @@ extension HomeTabBarTypeEx on HomeTabBarType {
         return 'Home';
       case HomeTabBarType.discover:
         return 'Discover';
+      case HomeTabBarType.wallet:
+        return 'Wallet';
       case HomeTabBarType.me:
         return 'Me';
     }
@@ -33,8 +36,16 @@ extension HomeTabBarTypeEx on HomeTabBarType {
         return 'state_machine_home';
       case HomeTabBarType.discover:
         return 'state_machine_discover';
+      case HomeTabBarType.wallet:
+        return 'state_machine_wallet';
       case HomeTabBarType.me:
         return 'state_machine_me';
     }
+  }
+
+  /// Whether this tab type uses a Rive animation file.
+  /// Wallet tab uses a static icon instead.
+  bool get usesRiveAnimation {
+    return this != HomeTabBarType.wallet;
   }
 }

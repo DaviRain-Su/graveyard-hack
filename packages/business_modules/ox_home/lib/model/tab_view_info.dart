@@ -48,6 +48,14 @@ class TabViewInfo {
             ),
           );
           break;
+        case HomeTabBarType.wallet:
+          tabViewInfo.add(
+            TabViewInfo(
+              moduleName: 'ox_solana',
+              modulePage: 'solanaWalletPageWidget',
+            ),
+          );
+          break;
         case HomeTabBarType.me:
           tabViewInfo.add(
             TabViewInfo(

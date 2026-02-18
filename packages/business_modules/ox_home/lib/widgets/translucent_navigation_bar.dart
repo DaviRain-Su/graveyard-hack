@@ -87,7 +87,7 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
   bool _isLogin = false;
   Timer? _refreshMessagesTimer;
   int selectedIndex = 1;
-  double middleIndex = (4 / 2).floorToDouble();
+  double middleIndex = (5 / 2).floorToDouble();
 
   final List<TranslucentNavigationBarItem> _itemList = [];
 
@@ -136,7 +136,7 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
     _horizontalPadding = widget.horizontalPadding ?? 20.px;
     _verticalPadding = widget.verticalPadding ?? 24.px;
     // Always show 4 tabs: home, contact, discover, me
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
     _animation = Tween<double>(begin: 0.0, end: 72 + 24.px).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
     prepareMessageTimer();
@@ -409,6 +409,17 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
         child: river.Rive(artboard: item.artboard!),
       );
     }
+    // Static icon for tabs without Rive animation (e.g. Wallet)
+    final int itemIndex = _itemList.indexOf(item);
+    if (itemIndex >= 0 && itemIndex < _typeList.length && _typeList[itemIndex] == HomeTabBarType.wallet) {
+      return Icon(
+        Icons.account_balance_wallet_outlined,
+        size: Adapt.px(24),
+        color: selectedIndex == itemIndex
+            ? ThemeColor.gradientMainStart
+            : ThemeColor.color100,
+      );
+    }
     return const SizedBox();
 
   }
@@ -424,6 +435,13 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
   }
 
   Future<void> _loadRiveFile(int index) async {
+    // Wallet tab uses a static icon, no Rive animation
+    if (!_typeList[index].usesRiveAnimation) {
+      riveControllers[index] = null;
+      riveArtboards[index] = null;
+      return;
+    }
+
     String animPath = "packages/ox_home/assets/${ThemeManager.images(_typeList[index].riveFileNames)}.riv";
 
     final data = await rootBundle.load(animPath);
@@ -499,21 +517,21 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
 
   @override
   void didMoveToTabBarCallBack() {
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
     dataInit();
   }
 
   @override
   void didMoveToTopCallBack() {
     // Always show 4 tabs: home, contact, discover, me
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
     dataInit();
   }
 
   @override
   void didDeleteMomentsCallBack() {
     // Always show 4 tabs: home, contact, discover, me
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
     dataInit();
   }
 

@@ -50,5 +50,8 @@ class OXSolana extends OXFlutterModule {
         'sendSol': ({required String toAddress, required double amount}) =>
             SolanaWalletService.instance
                 .sendSol(toAddress: toAddress, amount: amount),
+        // Widget interface for home tab bar embedding
+        'solanaWalletPageWidget': (BuildContext context) =>
+            const SolanaWalletPage(),
       };
 }
