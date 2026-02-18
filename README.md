@@ -8,7 +8,7 @@
 
 > **A privacy-first super app that integrates Solana's best protocols — Tapestry, Audius, KYD Labs, Torque, and DRiP — into a real Nostr messaging client.**
 
-Built on [0xchat](https://github.com/0xchat-app/0xchat-app-main) (MIT license), a production-grade Nostr client with 200K+ lines of code, E2E encrypted messaging, group chats, voice/video calls, and Cashu e-cash. We added 13,800+ lines of Dart integrating five Solana ecosystem protocols as first-class citizens inside private conversations.
+Built on [0xchat](https://github.com/0xchat-app/0xchat-app-main) (MIT license), a production-grade Nostr client with 200K+ lines of code, E2E encrypted messaging, group chats, voice/video calls, and Cashu e-cash. We added **14,400+ lines of Dart** integrating five Solana ecosystem protocols as first-class citizens inside private conversations.
 
 ---
 
@@ -71,11 +71,14 @@ Files: `audius_service.dart`, `audius_player_service.dart` (global singleton), `
 
 **Solana-powered event discovery inside chat:**
 
-- 📅 **Event Browser** — Recommended events, search, event details
-- 🎫 **Ticket Flow** — Cart, checkout, waitlist API integration
+- 📅 **Event Browser** — Recommended events, search, event details with hero images
+- 💬 **Chat Sharing** — `🎫 Event` button in chat "+" menu → pick event → send rich message
+- 📆 **Add to Calendar** — One-tap Google Calendar integration from event details
+- 🎫 **Ticket Info** — Prices, sold-out status, waitlist, venue + map
+- ◎ **NFT Ticket Badge** — Highlights events with Solana NFT tickets
 - 🔍 **API Reverse-Engineered** — Full KYD API mapped: `/events/recommended`, `/events/{id}`, `/events/{id}/cart`, `/events/{id}/checkoutv2`
 
-Files: `kyd_service.dart` (465 lines), `kyd_events_page.dart` (805 lines)
+Files: `kyd_service.dart` (465 lines), `kyd_events_page.dart` (880+ lines)
 
 ### 🏅 Track 4: Torque — Loyalty & Rewards ($1K)
 
@@ -87,11 +90,13 @@ Files: `torque_service.dart` (569 lines), `torque_quests_page.dart` (681 lines)
 
 ### 🖼️ Track 5: DRiP / NFT ($2.5K)
 
-- 🎨 **NFT Gallery** — Browse wallet NFTs via Helius API (supports cNFTs)
+- 🎨 **NFT Gallery** — 3 tabs: All NFTs / 💧 DRiP Collection / 🔍 Discover
+- 💧 **DRiP Integration** — Auto-detect DRiP collectibles, branded collection view
+- 🔍 **Drop Discovery** — Browse recent DRiP drops, one-tap collect via drip.haus
 - 💬 **Chat Sharing** — Pick NFT from gallery → send as rich message with image + explorer link
-- 🔗 **On-chain Metadata** — Full metadata parsing including IPFS artwork resolution
+- 🔗 **On-chain Metadata** — Full metadata parsing including IPFS artwork resolution, cNFT support
 
-Files: `nft_service.dart`, `nft_gallery_page.dart`
+Files: `nft_service.dart` + `DripService` (integrated), `nft_gallery_page.dart`
 
 ---
 
@@ -104,6 +109,7 @@ All Solana features are accessible from the chat **"+"** menu:
 | 🧧 SOL Red Packet | Send SOL as a red envelope | Group & 1-on-1 chats |
 | 🖼️ NFT | Share NFT from wallet | Opens picker → sends text with image + explorer link |
 | 🎵 Music | Share Audius track | Opens picker → one-tap Send → music card in chat |
+| 🎫 Event | Share KYD event | Opens event browser → pick → sends event card |
 | 💸 SOL Transfer | Send SOL to chat partner | Auto-resolves Nostr pubkey → Solana address via Tapestry |
 | ⚡ Zaps | Lightning zaps | Native Nostr zaps (inherited from 0xchat) |
 
