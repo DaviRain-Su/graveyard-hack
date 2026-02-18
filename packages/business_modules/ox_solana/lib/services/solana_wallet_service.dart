@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:solana/solana.dart';
 import 'package:solana/dto.dart' hide Account;
@@ -23,10 +24,18 @@ class SolanaWalletService extends ChangeNotifier {
   SolanaClient? _client;
 
   String get address => _keyPair?.address ?? '';
+  String? get publicKey => _keyPair?.address;
   bool get hasWallet => _keyPair != null;
 
   /// Expose key pair for transaction signing (used by Jupiter swap)
   Ed25519HDKeyPair? get keyPair => _keyPair;
+
+  /// Sign an arbitrary message with ed25519 (used by Torque, DApp Connect, etc.)
+  Future<Uint8List> signMessage(Uint8List message) async {
+    if (_keyPair == null) throw Exception('No wallet');
+    final signature = await _keyPair!.sign(message);
+    return Uint8List.fromList(signature.bytes);
+  }
 
   double _balance = 0;
   double get balance => _balance;

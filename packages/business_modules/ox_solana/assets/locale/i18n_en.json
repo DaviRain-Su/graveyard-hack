@@ -131,5 +131,16 @@
   "tapestry_connect": "Connect to Tapestry",
   "tapestry_create_profile": "Create Profile on Tapestry",
   "tapestry_edit_profile": "Edit Profile",
-  "tapestry_search": "Search users across all Tapestry apps"
+  "tapestry_search": "Search users across all Tapestry apps",
+  "torque_quests": "Torque Quests",
+  "torque_desc": "Complete tasks & earn token rewards",
+  "torque_login": "Sign in with Wallet",
+  "torque_available": "Available",
+  "torque_active": "Active",
+  "torque_rewards": "Rewards",
+  "torque_accept": "Accept Quest",
+  "torque_no_quests": "No available quests",
+  "torque_no_active": "No active quests",
+  "torque_no_rewards": "No rewards yet",
+  "torque_complete": "Complete quests to earn rewards!"
 }

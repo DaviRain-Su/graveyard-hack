@@ -20,6 +20,8 @@ import 'page/dapp_connect_page.dart';
 import 'services/nft_service.dart';
 import 'services/dapp_connect_service.dart';
 import 'services/chat_transfer_service.dart';
+import 'services/torque_service.dart';
+import 'page/torque_quests_page.dart';
 
 class OXSolana extends OXFlutterModule {
   static final OXSolana shared = OXSolana._();
@@ -38,6 +40,7 @@ class OXSolana extends OXFlutterModule {
     );
     await RedPacketService.instance.init();
     await DappConnectService.instance.init();
+    await TorqueService.instance.init();
     // Pre-fetch token prices (non-blocking)
     PriceService.instance.fetchPrices();
   }

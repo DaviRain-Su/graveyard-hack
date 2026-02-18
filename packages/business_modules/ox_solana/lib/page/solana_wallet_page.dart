@@ -18,6 +18,7 @@ import 'audius_page.dart';
 import 'nft_gallery_page.dart';
 import 'dapp_connect_page.dart';
 import 'tapestry_social_page.dart';
+import 'torque_quests_page.dart';
 
 /// Main Solana wallet page — shows balance, address, and action buttons
 class SolanaWalletPage extends StatefulWidget {
@@ -241,6 +242,8 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
           _buildAudiusShortcut(),
           SizedBox(height: Adapt.px(10)),
           _buildDappConnectShortcut(),
+          SizedBox(height: Adapt.px(10)),
+          _buildTorqueQuestsShortcut(),
           SizedBox(height: Adapt.px(24)),
 
           // ── Settings ──
@@ -1086,6 +1089,51 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                   Text('Audius Music',
                       style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
                   Text('Discover & share decentralized music',
+                      style: TextStyle(color: ThemeColor.color100, fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTorqueQuestsShortcut() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TorqueQuestsPage()),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF6366F1).withOpacity(0.15), Color(0xFFF59E0B).withOpacity(0.1)],
+          ),
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: Color(0xFF6366F1).withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Color(0xFF6366F1).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(child: Text('🎯', style: TextStyle(fontSize: 18))),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Torque Quests',
+                      style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('Complete tasks & earn token rewards',
                       style: TextStyle(color: ThemeColor.color100, fontSize: 11)),
                 ],
               ),

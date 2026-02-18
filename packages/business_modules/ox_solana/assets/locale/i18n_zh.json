@@ -131,5 +131,16 @@
   "tapestry_connect": "连接 Tapestry",
   "tapestry_create_profile": "在 Tapestry 上创建档案",
   "tapestry_edit_profile": "编辑档案",
-  "tapestry_search": "搜索 Tapestry 上的所有用户"
+  "tapestry_search": "搜索 Tapestry 上的所有用户",
+  "torque_quests": "Torque 任务",
+  "torque_desc": "完成任务赚取代币奖励",
+  "torque_login": "使用钱包签名登录",
+  "torque_available": "可参与",
+  "torque_active": "进行中",
+  "torque_rewards": "奖励",
+  "torque_accept": "接受任务",
+  "torque_no_quests": "暂无可用任务",
+  "torque_no_active": "暂无进行中任务",
+  "torque_no_rewards": "暂无奖励",
+  "torque_complete": "完成任务赚取奖励！"
 }
