@@ -463,6 +463,29 @@ class SolanaWalletService extends ChangeNotifier {
     }
   }
 
+  /// Wait for transaction confirmation (poll getTransaction)
+  Future<bool> waitForConfirmation(
+    String signature, {
+    Duration timeout = const Duration(seconds: 30),
+    Duration pollInterval = const Duration(seconds: 2),
+  }) async {
+    if (_client == null) throw Exception('Wallet not initialized');
+    final endAt = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(endAt)) {
+      try {
+        final details = await _client!.rpcClient.getTransaction(
+          signature,
+          encoding: Encoding.jsonParsed,
+        );
+        if (details?.meta != null) {
+          return details!.meta!.err == null;
+        }
+      } catch (_) {}
+      await Future.delayed(pollInterval);
+    }
+    return false;
+  }
+
   /// Delete wallet — removes all key material from secure storage
   Future<void> deleteWallet() async {
     _keyPair = null;

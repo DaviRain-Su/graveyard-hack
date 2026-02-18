@@ -315,6 +315,7 @@ class _SendSolPageState extends State<SendSolPage> {
 
     if (confirmed != true) return;
 
+    HapticFeedback.lightImpact();
     setState(() => _isSending = true);
 
     try {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ox_common/business_interface/ox_chat/interface.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_common/widgets/common_loading.dart';
@@ -91,6 +92,7 @@ class ChatTransferService {
           ),
           TextButton(
             onPressed: () async {
+              HapticFeedback.lightImpact();
               final amountStr = amountController.text.trim();
               final amount = double.tryParse(amountStr);
               if (amount == null || amount <= 0) {
@@ -163,7 +165,7 @@ class ChatTransferService {
 
       OXLoading.dismiss();
 
-      // 3. Send template message in chat (notify recipient)
+      // 3. Send template message in chat (pending)
       final transferData = {
         'type': 'sol_transfer',
         'amount': amount.toString(),
@@ -177,9 +179,18 @@ class ChatTransferService {
         context,
         receiverPubkey: recipientNostrPubkey,
         title: '💸 SOL Transfer',
-        subTitle: '${amount.toStringAsFixed(4)} SOL • ${wallet.networkName}',
+        subTitle: '${amount.toStringAsFixed(4)} SOL • ${wallet.networkName} (pending)',
         icon: 'chat_sol_icon.png',
         link: 'solana:tx:$signature',
+      );
+
+      // 4. Wait for confirmation in background → send status update
+      _confirmAndNotify(
+        context,
+        receiverPubkey: recipientNostrPubkey,
+        signature: signature,
+        amount: amount,
+        network: wallet.networkName,
       );
 
       if (context.mounted) {
@@ -190,6 +201,31 @@ class ChatTransferService {
       if (context.mounted) {
         CommonToast.instance.show(context, 'Transfer failed: $e');
       }
+    }
+  }
+
+  /// Confirm transfer on-chain and send status update
+  static Future<void> _confirmAndNotify(
+    BuildContext context, {
+    required String receiverPubkey,
+    required String signature,
+    required double amount,
+    required String network,
+  }) async {
+    try {
+      final confirmed = await SolanaWalletService.instance
+          .waitForConfirmation(signature);
+
+      OXChatInterface.sendTemplateMessage(
+        context,
+        receiverPubkey: receiverPubkey,
+        title: confirmed ? '✅ Transfer Confirmed' : '❌ Transfer Failed',
+        subTitle: '${amount.toStringAsFixed(4)} SOL • $network',
+        icon: 'chat_sol_icon.png',
+        link: 'solana:tx:$signature',
+      );
+    } catch (_) {
+      // ignore
     }
   }
 
