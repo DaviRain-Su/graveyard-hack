@@ -241,7 +241,7 @@ class ImagePickerUtils {
       pageSize: 320,
       gridThumbnailSize: const ThumbnailSize(80, 80),
       previewThumbnailSize: const ThumbnailSize(150, 150),
-      specialItemPosition: showCamera ? SpecialItemPosition.prepend : SpecialItemPosition.none,
+      // specialItemPosition removed in wechat_assets_picker 10.x
     );
 
     // Show picker and get selected assets

@@ -1,0 +1,9 @@
+name: tor
+description: Stub tor package (no Rust FFI, for development builds)
+version: 0.0.9
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.0.0"
+dependencies:
+  flutter:
+    sdk: flutter

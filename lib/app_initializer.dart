@@ -26,6 +26,7 @@ import 'package:ox_push/push_lib.dart';
 import 'package:ox_theme/ox_theme.dart';
 import 'package:ox_usercenter/ox_usercenter.dart';
 import 'package:ox_wallet/ox_wallet.dart';
+import 'package:ox_solana/ox_solana.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dart_ping_ios/dart_ping_ios.dart';
 import 'package:ox_chat/utils/translate_service.dart';
@@ -117,6 +118,7 @@ class AppInitializer {
       OxCalling().setup(),
       OxChatHome().setup(),
       OXWallet().setup(),
+      OXSolana().setup(),
     ]);
   }
 

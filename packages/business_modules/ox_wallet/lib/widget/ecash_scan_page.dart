@@ -46,7 +46,6 @@ class EcashScanPageState extends State<EcashScanPage> {
       formats: [BarcodeFormat.qrCode],
       autoStart: true,
       cameraResolution: preferredResolution,
-      useNewCameraSelector: Platform.isAndroid,
     );
   }
 
@@ -202,11 +201,11 @@ class EcashScanPageState extends State<EcashScanPage> {
       controller: _scannerController,
       fit: BoxFit.cover,
       onDetect: _handleBarcodeDetection,
-      errorBuilder: (context, error, child) {
+      errorBuilder: (context, error) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _handleScannerError(error);
         });
-        return child ?? Container(color: Colors.black);
+        return Container(color: Colors.black);
       },
     );
   }

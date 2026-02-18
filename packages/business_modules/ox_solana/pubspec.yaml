@@ -1,0 +1,35 @@
+name: ox_solana
+description: Solana wallet module for 0xchat
+version: 0.0.1
+
+environment:
+  sdk: '>=3.0.5 <4.0.0'
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 0xchat base dependencies
+  ox_module_service:
+    path: ../../base_framework/ox_module_service/
+  ox_common:
+    path: ../../base_framework/ox_common
+  ox_theme:
+    path: ../../base_framework/ox_theme
+  ox_localizable:
+    path: ../../base_framework/ox_localizable
+  chatcore:
+    path: ../../0xchat-core
+
+  # Solana SDK
+  solana: ^0.32.0
+
+  # QR code
+  qr_flutter: ^4.1.0
+  pretty_qr_code: ^2.0.3
+
+flutter:
+  assets:
+    - assets/images/
+    - assets/locale/

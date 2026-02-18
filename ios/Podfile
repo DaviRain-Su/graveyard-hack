@@ -43,8 +43,9 @@ post_install do |installer|
     # Set minimum iOS deployment target for all pods
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
-    end
-    
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+      config.build_settings.delete('EXCLUDED_ARCHS[sdk=iphonesimulator*]')
+    end    
     privacy_file_path = File.join(File.dirname(__FILE__), 'PrivacyInfo.xcprivacy')
 
     if File.exist?(privacy_file_path)

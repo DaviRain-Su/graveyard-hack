@@ -19,7 +19,7 @@ dependencies:
   shared_preferences: ^2.0.5
   event_bus: ^2.0.0
 
-  visibility_detector: ^0.3.3
+  visibility_detector: ^0.4.0
   encrypt: ^5.0.3
   cached_network_image: 3.3.0
   package_info_plus: ^8.1.4
@@ -30,16 +30,16 @@ dependencies:
   flutter_card_swipper : ^0.4.0
   permission_handler: ^11.0.0
   flutter_easyloading: ^3.0.0
-  mobile_scanner: ^6.0.11
+  mobile_scanner: ^7.0.0
   archive: ^3.1.2
-  fl_chart: ^0.35.0
+  fl_chart: ^1.0.0
   pretty_qr_code: ^2.0.2
   dart_ping: ^6.0.0
   dart_ping_ios: ^1.1.0
   lpinyin: ^2.0.0
   flutter_sticky_header: ^0.7.0
-  syncfusion_flutter_core: '>=20.4.51 <20.4.52'
-  syncfusion_flutter_sliders: '>=20.4.51 <20.4.52'
+  syncfusion_flutter_core: ^28.1.33
+  syncfusion_flutter_sliders: ^28.1.33
   html: ^0.15.0
   rive: ^0.13.20
   marquee: ^2.2.0
@@ -86,7 +86,7 @@ dependencies:
   emoji_picker_flutter: 1.5.4
   window_manager: ^0.4.3
   fc_native_video_thumbnail: ^0.17.2
-  wechat_assets_picker: ^9.2.1
+  wechat_assets_picker: ^10.0.0
   photo_manager: ^3.5.0
   path_provider: ^2.1.1
 

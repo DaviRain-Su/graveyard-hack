@@ -27,6 +27,12 @@ class _DefaultCupertinoLocalizations extends CupertinoLocalizations {
   final DefaultCupertinoLocalizations _en = const DefaultCupertinoLocalizations();
 
   @override
+  String get backButtonLabel => _en.backButtonLabel;
+
+  @override
+  String get cancelButtonLabel => _en.cancelButtonLabel;
+
+  @override
   String get alertDialogLabel => Localized.text('ox_common.alertDialogLabel');
 
   @override

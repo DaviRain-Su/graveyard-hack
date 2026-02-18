@@ -160,11 +160,11 @@ class _SettingsPageState extends State<SettingsPage> with OXChatObserver {
             text: Localized.text('ox_usercenter.str_claim_ecash_confirm'),
             onTap: () async {
               OXNavigator.pop(context);
-              final result = await NpubCash.claim();
-              if(result.isSuccess && result.token != null){
+              final token = await NpubCash.claim();
+              if(token != null){
                 OXLoading.show();
                 final response = await Cashu.redeemEcash(
-                  ecashString: result.token!,
+                  ecashString: token,
                 );
                 OXLoading.dismiss();
                 CommonToast.instance.show(
@@ -174,7 +174,7 @@ class _SettingsPageState extends State<SettingsPage> with OXChatObserver {
               } else {
                 CommonToast.instance.show(
                   context,
-                  result.errorMessage ?? Localized.text('ox_usercenter.str_claim_ecash_fail'),
+                  Localized.text('ox_usercenter.str_claim_ecash_fail'),
                 );
               }
             },

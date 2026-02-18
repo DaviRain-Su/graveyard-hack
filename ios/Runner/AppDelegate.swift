@@ -11,7 +11,7 @@ import ox_push
     ) -> Bool {
         OCXCrashManager.shared.appLaunched()
         OCXCrashManager.shared.continueCallback = {
-            OXCLaunchCoordinator.shared.start(window: self.window)
+            if let w = self.window { OXCLaunchCoordinator.shared.start(window: w) }
         }
         if OCXCrashManager.shared.showCrashAlert {
             
@@ -22,7 +22,7 @@ import ox_push
             return false
         }
         
-        OXCLaunchCoordinator.shared.start(window: self.window)
+        if let w = self.window { OXCLaunchCoordinator.shared.start(window: w) }
         
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
