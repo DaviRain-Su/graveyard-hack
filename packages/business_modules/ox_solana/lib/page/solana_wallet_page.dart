@@ -80,28 +80,41 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.account_balance_wallet_outlined,
-                size: 80, color: ThemeColor.color100),
+            // Solana logo gradient circle
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Icon(Icons.account_balance_wallet_outlined,
+                  size: 48, color: Colors.white),
+            ),
             SizedBox(height: Adapt.px(24)),
             Text(
-              'No Solana Wallet',
+              'Solana Wallet',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: ThemeColor.color0,
               ),
             ),
             SizedBox(height: Adapt.px(8)),
             Text(
-              'Create a new wallet or import an existing one',
-              style: TextStyle(fontSize: 14, color: ThemeColor.color100),
+              'Send, receive, swap tokens and collect NFTs\non the fastest blockchain',
+              style: TextStyle(fontSize: 14, color: ThemeColor.color100, height: 1.4),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: Adapt.px(40)),
             _buildButton(
               label: 'Create New Wallet',
               icon: Icons.add,
-              color: const Color(0xFF9945FF), // Solana purple
+              color: const Color(0xFF9945FF),
               onTap: _createWallet,
             ),
             SizedBox(height: Adapt.px(16)),
@@ -199,43 +212,43 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
           ],
           SizedBox(height: Adapt.px(24)),
 
-          // SPL Token list
+          // ── Tokens ──
+          _buildSectionHeader('Tokens', icon: Icons.token),
+          SizedBox(height: Adapt.px(8)),
           const TokenListWidget(),
           SizedBox(height: Adapt.px(24)),
 
-          // Address section
+          // ── Account ──
+          _buildSectionHeader('Account', icon: Icons.person_outline),
+          SizedBox(height: Adapt.px(8)),
           _buildAddressSection(),
-          SizedBox(height: Adapt.px(16)),
-
-          // Explorer link
+          SizedBox(height: Adapt.px(10)),
           _buildExplorerLink(),
-          SizedBox(height: Adapt.px(16)),
+          if (_walletService.nostrPubkey != null) ...[
+            SizedBox(height: Adapt.px(10)),
+            _buildNostrBindingInfo(),
+          ],
+          SizedBox(height: Adapt.px(24)),
 
-          // Discover section
+          // ── Discover ──
+          _buildSectionHeader('Discover', icon: Icons.explore_outlined),
+          SizedBox(height: Adapt.px(8)),
           _buildNftShortcut(),
           SizedBox(height: Adapt.px(10)),
           _buildAudiusShortcut(),
           SizedBox(height: Adapt.px(10)),
           _buildDappConnectShortcut(),
-          SizedBox(height: Adapt.px(16)),
+          SizedBox(height: Adapt.px(24)),
 
-          // Nostr binding info
-          if (_walletService.nostrPubkey != null) ...[
-            _buildNostrBindingInfo(),
-            SizedBox(height: Adapt.px(16)),
-          ],
-
-          // Backup recovery phrase
+          // ── Settings ──
+          _buildSectionHeader('Settings', icon: Icons.settings_outlined),
+          SizedBox(height: Adapt.px(8)),
           if (_walletService.hasMnemonic) ...[
             _buildBackupButton(),
-            SizedBox(height: Adapt.px(12)),
+            SizedBox(height: Adapt.px(10)),
           ],
-
-          // RPC Settings
           _buildRpcSetting(),
-          SizedBox(height: Adapt.px(12)),
-
-          // Delete wallet
+          SizedBox(height: Adapt.px(10)),
           _buildDeleteWalletButton(),
           SizedBox(height: Adapt.px(40)),
         ],
@@ -264,39 +277,82 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('SOL Balance',
-              style: TextStyle(color: Colors.white70, fontSize: 14)),
-          SizedBox(height: Adapt.px(8)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('SOL Balance',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _walletService.isDevnet ? '🟡 Devnet' : '🟢 Mainnet',
+                  style: TextStyle(color: Colors.white, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: Adapt.px(12)),
           _walletService.isLoading
-              ? const SizedBox(
-                  height: 36,
-                  width: 36,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ? Row(
                   children: [
-                    Text(
-                      '${_walletService.balance.toStringAsFixed(4)} SOL',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (PriceService.instance.solPrice > 0 && !_walletService.isDevnet) ...[
-                      SizedBox(height: 4),
+                    const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2)),
+                    SizedBox(width: 12),
+                    Text('Loading...', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                  ],
+                )
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Column(
+                    key: ValueKey(_walletService.balance),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '≈ ${PriceService.instance.formatUsdValue(_walletService.balance, 'So11111111111111111111111111111111111111112')}',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                        '${_walletService.balance.toStringAsFixed(4)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          height: 1.1,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text('SOL',
+                              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
+                          if (PriceService.instance.solPrice > 0 && !_walletService.isDevnet) ...[
+                            SizedBox(width: 12),
+                            Text(
+                              '≈ ${PriceService.instance.formatUsdValue(_walletService.balance, 'So11111111111111111111111111111111111111112')}',
+                              style: TextStyle(color: Colors.white60, fontSize: 14),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
-                  ],
+                  ),
                 ),
           if (_walletService.error != null) ...[
             SizedBox(height: 8),
-            Text(_walletService.error!,
-                style: TextStyle(color: Colors.red[200], fontSize: 12)),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(_walletService.error!,
+                  style: TextStyle(color: Colors.red[200], fontSize: 12)),
+            ),
           ],
         ],
       ),
@@ -475,6 +531,33 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         CommonToast.instance.show(context, 'Error: $e');
       }
     }
+  }
+
+  Widget _buildSectionHeader(String title, {IconData? icon}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 16, color: ThemeColor.color100),
+          SizedBox(width: 6),
+        ],
+        Text(
+          title,
+          style: TextStyle(
+            color: ThemeColor.color100,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 0.5,
+            color: ThemeColor.color160,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildActionButton({

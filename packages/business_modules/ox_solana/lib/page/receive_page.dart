@@ -28,31 +28,56 @@ class ReceivePage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // QR Code
-              Container(
-                padding: EdgeInsets.all(Adapt.px(16)),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(Adapt.px(16)),
-                ),
-                child: QrImageView(
-                  data: 'solana:$address',
-                  size: Adapt.px(220),
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: Color(0xFF9945FF),
+              // Network badge
+              if (SolanaWalletService.instance.isDevnet)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  margin: EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
                   ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: Colors.black87,
+                  child: Text('⚠️ Devnet Address — test only',
+                      style: TextStyle(color: Colors.orange, fontSize: 12)),
+                ),
+
+              // QR Code with gradient border
+              Container(
+                padding: EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(Adapt.px(20)),
+                ),
+                child: Container(
+                  padding: EdgeInsets.all(Adapt.px(16)),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(Adapt.px(17)),
+                  ),
+                  child: QrImageView(
+                    data: 'solana:$address',
+                    size: Adapt.px(220),
+                    backgroundColor: Colors.white,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF9945FF),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
               ),
-              SizedBox(height: Adapt.px(24)),
+              SizedBox(height: Adapt.px(20)),
 
               Text(
-                'Scan to send SOL',
+                'Scan to send SOL to this address',
                 style: TextStyle(color: ThemeColor.color100, fontSize: 14),
               ),
               SizedBox(height: Adapt.px(20)),

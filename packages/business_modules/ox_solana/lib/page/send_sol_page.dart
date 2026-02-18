@@ -152,26 +152,48 @@ class _SendSolPageState extends State<SendSolPage> {
             ),
             const Spacer(),
 
-            // Send button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSending ? null : _sendSol,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9945FF),
-                  padding: EdgeInsets.symmetric(vertical: Adapt.px(16)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Send button with gradient
+            GestureDetector(
+              onTap: _isSending ? null : _sendSol,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: Adapt.px(16)),
+                decoration: BoxDecoration(
+                  gradient: _isSending ? null : const LinearGradient(
+                    colors: [Color(0xFF9945FF), Color(0xFF14F195)],
                   ),
+                  color: _isSending ? ThemeColor.color180 : null,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _isSending ? [] : [
+                    BoxShadow(
+                      color: const Color(0xFF9945FF).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: _isSending
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
-                    : const Text('Send SOL',
-                        style: TextStyle(color: Colors.white, fontSize: 16)),
+                child: Center(
+                  child: _isSending
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(height: 20, width: 20,
+                                child: CircularProgressIndicator(color: ThemeColor.color100, strokeWidth: 2)),
+                            SizedBox(width: 12),
+                            Text('Sending...', style: TextStyle(color: ThemeColor.color100, fontSize: 16)),
+                          ],
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Send SOL',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                ),
               ),
             ),
             SizedBox(height: Adapt.px(16)),

@@ -24,48 +24,42 @@ class TokenListWidget extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.px),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Tokens',
-                    style: TextStyle(
-                      color: ThemeColor.color0,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+            // Token count + refresh
+            if (tokens.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(bottom: Adapt.px(8)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${tokens.length} token${tokens.length == 1 ? '' : 's'}',
+                      style: TextStyle(color: ThemeColor.color110, fontSize: 12),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () => service.fetchTokens(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (service.isLoadingTokens)
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: ThemeColor.color100,
-                            ),
-                          )
-                        else
-                          Icon(Icons.refresh, size: 16, color: ThemeColor.color100),
-                        SizedBox(width: 4),
-                        Text(
-                          'Refresh',
-                          style: TextStyle(color: ThemeColor.color100, fontSize: 13),
-                        ),
-                      ],
+                    GestureDetector(
+                      onTap: () => service.fetchTokens(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (service.isLoadingTokens)
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: ThemeColor.color100,
+                              ),
+                            )
+                          else
+                            Icon(Icons.refresh, size: 14, color: ThemeColor.color100),
+                          SizedBox(width: 4),
+                          Text('Refresh',
+                              style: TextStyle(color: ThemeColor.color100, fontSize: 12)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            SizedBox(height: Adapt.px(12)),
 
             // Token list or empty state
             if (tokens.isEmpty && !service.isLoadingTokens)
@@ -107,19 +101,80 @@ class TokenListWidget extends StatelessWidget {
   }
 
   Widget _buildLoadingState() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(Adapt.px(24)),
-      decoration: BoxDecoration(
-        color: ThemeColor.color180,
-        borderRadius: BorderRadius.circular(Adapt.px(12)),
-      ),
-      child: Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: const Color(0xFF9945FF),
+    // Skeleton loading with shimmer-like placeholders
+    return Column(
+      children: List.generate(3, (i) => Container(
+        margin: EdgeInsets.only(bottom: Adapt.px(2)),
+        padding: EdgeInsets.symmetric(
+          horizontal: Adapt.px(16),
+          vertical: Adapt.px(14),
         ),
-      ),
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+        ),
+        child: Row(
+          children: [
+            // Circle placeholder
+            Container(
+              width: Adapt.px(40),
+              height: Adapt.px(40),
+              decoration: BoxDecoration(
+                color: ThemeColor.color160,
+                shape: BoxShape.circle,
+              ),
+            ),
+            SizedBox(width: Adapt.px(12)),
+            // Text placeholders
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: ThemeColor.color160,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Container(
+                    width: 50,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: ThemeColor.color170,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  width: 60,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: ThemeColor.color160,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                SizedBox(height: 6),
+                Container(
+                  width: 40,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: ThemeColor.color170,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      )),
     );
   }
 
