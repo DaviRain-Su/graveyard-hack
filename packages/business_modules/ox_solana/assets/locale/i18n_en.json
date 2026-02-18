@@ -142,5 +142,11 @@
   "torque_no_quests": "No available quests",
   "torque_no_active": "No active quests",
   "torque_no_rewards": "No rewards yet",
-  "torque_complete": "Complete quests to earn rewards!"
+  "torque_complete": "Complete quests to earn rewards!",
+  "kyd_events": "KYD Events",
+  "kyd_desc": "Live events with Solana NFT tickets",
+  "kyd_get_tickets": "Get Tickets",
+  "kyd_sold_out": "Sold Out",
+  "kyd_low_tickets": "Low Tickets",
+  "kyd_join_waitlist": "Join Waitlist"
 }

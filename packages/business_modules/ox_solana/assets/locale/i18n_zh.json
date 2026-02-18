@@ -142,5 +142,11 @@
   "torque_no_quests": "暂无可用任务",
   "torque_no_active": "暂无进行中任务",
   "torque_no_rewards": "暂无奖励",
-  "torque_complete": "完成任务赚取奖励！"
+  "torque_complete": "完成任务赚取奖励！",
+  "kyd_events": "KYD 活动",
+  "kyd_desc": "Solana NFT门票现场活动",
+  "kyd_get_tickets": "获取门票",
+  "kyd_sold_out": "已售罄",
+  "kyd_low_tickets": "余票不多",
+  "kyd_join_waitlist": "加入等候名单"
 }
