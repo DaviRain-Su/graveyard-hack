@@ -14,6 +14,7 @@ import 'send_sol_page.dart';
 import 'receive_page.dart';
 import 'transaction_history_page.dart';
 import 'swap_page.dart';
+import 'audius_page.dart';
 
 /// Main Solana wallet page — shows balance, address, and action buttons
 class SolanaWalletPage extends StatefulWidget {
@@ -206,6 +207,10 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
 
           // Explorer link
           _buildExplorerLink(),
+          SizedBox(height: Adapt.px(16)),
+
+          // Audius music shortcut
+          _buildAudiusShortcut(),
           SizedBox(height: Adapt.px(16)),
 
           // Nostr binding info
@@ -811,6 +816,51 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               ),
             ),
             Icon(Icons.copy, size: 16, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudiusShortcut() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AudiusPage()),
+      ),
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF7E1BCC).withOpacity(0.15), Color(0xFFCC0FE0).withOpacity(0.1)],
+          ),
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: Color(0xFF7E1BCC).withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Color(0xFF7E1BCC).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(child: Text('🎵', style: TextStyle(fontSize: 18))),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Audius Music',
+                      style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('Discover & share decentralized music',
+                      style: TextStyle(color: ThemeColor.color100, fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ThemeColor.color100),
           ],
         ),
       ),

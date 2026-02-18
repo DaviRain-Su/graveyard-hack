@@ -49,12 +49,14 @@ class ChatPageConfig {
       if(isMobile) InputMoreItemEx.camera(handler),
       if(isMobile) InputMoreItemEx.video(handler),
       InputMoreItemEx.ecash(handler),
+      // SOL Red Packet — works in both group and single chats
+      InputMoreItemEx.solRedPacket(handler),
     ];
 
     final otherUser = handler.otherUser;
     if (handler.session.chatType == ChatType.chatSingle && otherUser != null) {
       items.add(InputMoreItemEx.zaps(handler, otherUser));
-      // Send SOL — Solana wallet integration
+      // Send SOL — Solana wallet integration (1-on-1 only)
       items.add(InputMoreItemEx.sendSol(handler, otherUser));
       if(isMobile){
         items.add(InputMoreItemEx.call(handler, otherUser));
@@ -207,6 +209,49 @@ extension InputMoreItemEx on InputMoreItem {
           ], {
             #recipientNostrPubkey: user.pubKey,
             #recipientName: user.name ?? user.pubKey.substring(0, 8),
+          });
+        },
+      );
+
+  /// SOL Red Packet 🧧 — send SOL red packets in any chat
+  static InputMoreItem solRedPacket(ChatGeneralHandler handler) =>
+      InputMoreItem(
+        id: 'solRedPacket',
+        title: () => '🧧 SOL',
+        iconName: 'chat_sol_icon.png',
+        action: (context) {
+          final hasSolanaWallet = OXModuleService.invoke('ox_solana', 'hasSolanaWallet', []);
+          if (hasSolanaWallet != true) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: ThemeColor.color180,
+                title: Text('Solana Wallet Required', style: TextStyle(color: ThemeColor.color0)),
+                content: Text(
+                  'Create a Solana wallet first to send red packets.',
+                  style: TextStyle(color: ThemeColor.color100),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      OXModuleService.pushPage(context, 'ox_solana', 'SolanaWalletPage', {});
+                    },
+                    child: Text('Go to Wallet', style: TextStyle(color: Color(0xFF9945FF), fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          final isGroup = handler.session.hasMultipleUsers;
+          OXModuleService.pushPage(context, 'ox_solana', 'RedPacketPage', {
+            'isGroup': isGroup,
           });
         },
       );

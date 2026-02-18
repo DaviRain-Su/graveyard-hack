@@ -7,11 +7,14 @@ import 'package:ox_module_service/ox_module_service.dart';
 import 'services/solana_wallet_service.dart';
 import 'services/tapestry_service.dart';
 import 'services/price_service.dart';
+import 'services/red_packet_service.dart';
 import 'page/solana_wallet_page.dart';
 import 'page/send_sol_page.dart';
 import 'page/receive_page.dart';
 import 'page/transaction_history_page.dart';
 import 'page/swap_page.dart';
+import 'page/red_packet_page.dart';
+import 'page/audius_page.dart';
 import 'services/chat_transfer_service.dart';
 
 class OXSolana extends OXFlutterModule {
@@ -27,6 +30,7 @@ class OXSolana extends OXFlutterModule {
     await super.setup();
     await SolanaWalletService.instance.init();
     await TapestryService.instance.init();
+    await RedPacketService.instance.init();
     // Pre-fetch token prices (non-blocking)
     PriceService.instance.fetchPrices();
   }
@@ -51,6 +55,20 @@ class OXSolana extends OXFlutterModule {
         return OXNavigator.pushPage(context, (ctx) => const TransactionHistoryPage());
       case 'SwapPage':
         return OXNavigator.pushPage(context, (ctx) => const SwapPage());
+      case 'RedPacketPage':
+        return OXNavigator.pushPage(
+            context,
+            (ctx) => RedPacketPage(
+                  isGroup: params?['isGroup'] ?? false,
+                  memberCount: params?['memberCount'],
+                  onCreated: params?['onCreated'],
+                ));
+      case 'AudiusPage':
+        return OXNavigator.pushPage(
+            context,
+            (ctx) => AudiusPage(
+                  onTrackSelected: params?['onTrackSelected'],
+                ));
     }
     return null;
   }
