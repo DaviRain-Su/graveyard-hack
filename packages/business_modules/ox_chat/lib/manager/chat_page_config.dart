@@ -274,6 +274,12 @@ extension InputMoreItemEx on InputMoreItem {
             return;
           }
 
+          // Capture chat context before navigating
+          final chatContext = context;
+          final receiverPubkey = handler.otherUser?.pubKey ?? '';
+          final chatType = handler.session.chatType;
+          final isMultiUser = handler.session.hasMultipleUsers;
+
           // Open NFT gallery in picker mode → on pick, send template message
           OXModuleService.pushPage(context, 'ox_solana', 'NftGalleryPage', {
             'pickerMode': true,
@@ -283,22 +289,22 @@ extension InputMoreItemEx on InputMoreItem {
               final mint = nft['mint'] ?? '';
               final image = nft['imageUrl'] ?? '';
 
-              // Send as template message in current chat
-              final receiverPubkey = handler.otherUser?.pubKey ?? '';
-              if (receiverPubkey.isEmpty && !handler.session.hasMultipleUsers) {
-                CommonToast.instance.show(context, 'Cannot determine recipient');
+              if (receiverPubkey.isEmpty && !isMultiUser) {
                 return;
               }
 
-              OXChatInterface.sendTemplateMessage(
-                context,
-                receiverPubkey: receiverPubkey,
-                title: '🖼️ $name',
-                subTitle: collection.isNotEmpty ? '$collection\nsolana:nft:$mint' : 'solana:nft:$mint',
-                icon: image,
-                link: 'https://explorer.solana.com/address/$mint',
-                chatType: handler.session.chatType,
-              );
+              // NFT gallery pops itself, use delayed send with captured context
+              Future.delayed(const Duration(milliseconds: 300), () {
+                OXChatInterface.sendTemplateMessage(
+                  chatContext,
+                  receiverPubkey: receiverPubkey,
+                  title: '🖼️ $name',
+                  subTitle: collection.isNotEmpty ? '$collection\nsolana:nft:$mint' : 'solana:nft:$mint',
+                  icon: image,
+                  link: 'https://explorer.solana.com/address/$mint',
+                  chatType: chatType,
+                );
+              });
             },
           });
         },
@@ -311,34 +317,48 @@ extension InputMoreItemEx on InputMoreItem {
         title: () => '🎵 Music',
         iconName: 'chat_more_icon.png', // reuse icon
         action: (context) {
+          // Capture chat context BEFORE navigating away
+          final chatContext = context;
+          final receiverPubkey = handler.otherUser?.pubKey ?? '';
+          final chatType = handler.session.chatType;
+          final isMultiUser = handler.session.hasMultipleUsers;
+
           // Open Audius in picker mode → on pick, send template message
           OXModuleService.pushPage(context, 'ox_solana', 'AudiusPage', {
             'onTrackSelected': (dynamic track) {
-              // track is an AudiusTrack — extract fields via module boundary
-              final trackMap = track as Map<String, dynamic>? ?? {};
+              // track arrives as Map<String,dynamic> from ox_solana module boundary
+              Map<String, dynamic> trackMap;
+              if (track is Map<String, dynamic>) {
+                trackMap = track;
+              } else if (track is Map) {
+                trackMap = Map<String, dynamic>.from(track);
+              } else {
+                trackMap = {};
+              }
+
               final title = trackMap['title'] ?? 'Track';
               final artist = trackMap['artist'] ?? '';
               final artwork = trackMap['artwork'] ?? '';
-              final shareUrl = trackMap['share_url'] ?? '';
+              final shareUrl = trackMap['share_url'] ?? 'https://audius.co';
 
-              final receiverPubkey = handler.otherUser?.pubKey ?? '';
-              if (receiverPubkey.isEmpty && !handler.session.hasMultipleUsers) {
-                CommonToast.instance.show(context, 'Cannot determine recipient');
+              if (receiverPubkey.isEmpty && !isMultiUser) {
                 return;
               }
 
-              OXChatInterface.sendTemplateMessage(
-                context,
-                receiverPubkey: receiverPubkey,
-                title: '🎵 $title',
-                subTitle: 'by $artist',
-                icon: artwork,
-                link: shareUrl,
-                chatType: handler.session.chatType,
-              );
-
-              // Pop back to chat
-              Navigator.of(context).pop();
+              // Use captured chat context for sending message
+              // The AudiusPage already pops itself via Navigator.pop(context)
+              // so we just need to send the message using the original chat context
+              Future.delayed(const Duration(milliseconds: 300), () {
+                OXChatInterface.sendTemplateMessage(
+                  chatContext,
+                  receiverPubkey: receiverPubkey,
+                  title: '🎵 $title',
+                  subTitle: 'by $artist • audius.co',
+                  icon: artwork,
+                  link: shareUrl,
+                  chatType: chatType,
+                );
+              });
             },
           });
         },

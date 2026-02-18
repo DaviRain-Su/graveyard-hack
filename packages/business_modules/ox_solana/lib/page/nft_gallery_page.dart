@@ -44,7 +44,7 @@ class _NftGalleryPageState extends State<NftGalleryPage> {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
       appBar: CommonAppBar(
-        title: '🖼️ NFT Gallery',
+        title: widget.pickerMode ? '🖼️ Pick NFT to Share' : '🖼️ NFT Gallery',
         backgroundColor: ThemeColor.color190,
         actions: [
           IconButton(

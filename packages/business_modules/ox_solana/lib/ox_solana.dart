@@ -1,5 +1,6 @@
 library ox_solana;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ox_common/navigator/navigator.dart';
 import 'package:ox_module_service/ox_module_service.dart';
@@ -79,17 +80,15 @@ class OXSolana extends OXFlutterModule {
                 ));
       case 'AudiusPage':
         final rawCallback = params?['onTrackSelected'];
-        // If callback expects Map (cross-module), wrap to convert AudiusTrack → Map
+        // Always wrap: convert AudiusTrack → Map<String,dynamic> at module boundary
         Function(AudiusTrack)? typedCallback;
-        if (rawCallback is Function(Map<String, dynamic>)) {
+        if (rawCallback != null) {
           typedCallback = (AudiusTrack track) {
-            rawCallback(track.toJson());
-          };
-        } else if (rawCallback is Function(AudiusTrack)) {
-          typedCallback = rawCallback;
-        } else if (rawCallback is Function(dynamic)) {
-          typedCallback = (AudiusTrack track) {
-            rawCallback(track.toJson());
+            try {
+              (rawCallback as Function)(track.toJson());
+            } catch (e) {
+              if (kDebugMode) print('[OXSolana] onTrackSelected callback error: $e');
+            }
           };
         }
         return OXNavigator.pushPage(

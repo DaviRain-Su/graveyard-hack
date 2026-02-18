@@ -145,7 +145,7 @@ class _AudiusPageState extends State<AudiusPage> {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
       appBar: CommonAppBar(
-        title: '🎵 Audius Music',
+        title: widget.onTrackSelected != null ? '🎵 Pick a Track to Share' : '🎵 Audius Music',
         backgroundColor: ThemeColor.color190,
       ),
       body: Column(
@@ -338,12 +338,35 @@ class _AudiusPageState extends State<AudiusPage> {
                   ],
                 ),
 
-                // More options
+                // Share-to-chat or more options
                 SizedBox(width: 4),
-                GestureDetector(
-                  onTap: () => _showTrackOptions(track),
-                  child: Icon(Icons.more_vert, size: 18, color: ThemeColor.color110),
-                ),
+                if (widget.onTrackSelected != null)
+                  GestureDetector(
+                    onTap: () {
+                      widget.onTrackSelected!(track);
+                      Navigator.of(context).pop();
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF9945FF).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.send, size: 13, color: Color(0xFF9945FF)),
+                          SizedBox(width: 4),
+                          Text('Send', style: TextStyle(color: Color(0xFF9945FF), fontSize: 11, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => _showTrackOptions(track),
+                    child: Icon(Icons.more_vert, size: 18, color: ThemeColor.color110),
+                  ),
               ],
             ),
           ),
