@@ -168,7 +168,8 @@ class SolanaWalletService extends ChangeNotifier {
       _mnemonic = bip39.generateMnemonic();
       _keyPair = await Ed25519HDKeyPair.fromMnemonic(_mnemonic!);
       await _saveWallet();
-      await refreshBalance();
+      // New wallet has no tokens — only fetch SOL balance, skip token list
+      await refreshBalance(includeTokens: false);
 
       if (kDebugMode) {
         print('[OXSolana] Wallet created from mnemonic: $address');
@@ -241,7 +242,7 @@ class SolanaWalletService extends ChangeNotifier {
   }
 
   /// Refresh SOL balance and SPL token list
-  Future<double> refreshBalance() async {
+  Future<double> refreshBalance({bool includeTokens = true}) async {
     if (_keyPair == null || _client == null) return 0;
 
     try {
@@ -250,16 +251,33 @@ class SolanaWalletService extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Also refresh token list in background
-      fetchTokens();
+      // Also refresh token list in background (with delay to avoid 429)
+      if (includeTokens) {
+        Future.delayed(const Duration(milliseconds: 500), () => fetchTokens());
+      }
 
       return _balance;
     } catch (e) {
-      _error = 'Failed to fetch balance: $e';
+      _error = _friendlyError(e);
       if (kDebugMode) print('[OXSolana] $_error');
       notifyListeners();
       return _balance;
     }
+  }
+
+  /// Convert raw error to user-friendly message
+  String _friendlyError(dynamic e) {
+    final msg = e.toString();
+    if (msg.contains('429') || msg.contains('Too many requests')) {
+      return 'Rate limited — please wait a moment and refresh';
+    }
+    if (msg.contains('SocketException') || msg.contains('Connection refused')) {
+      return 'Network error — check your connection';
+    }
+    if (msg.contains('timeout') || msg.contains('TimeoutException')) {
+      return 'Request timed out — try again';
+    }
+    return msg.length > 100 ? '${msg.substring(0, 100)}...' : msg;
   }
 
   /// Send SOL to an address
@@ -390,7 +408,7 @@ class SolanaWalletService extends ChangeNotifier {
       return tokenList;
     } catch (e) {
       if (kDebugMode) print('[OXSolana] Fetch tokens error: $e');
-      _error = 'Failed to fetch tokens: $e';
+      _error = _friendlyError(e);
       return _tokens;
     } finally {
       _isLoadingTokens = false;
