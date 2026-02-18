@@ -829,6 +829,16 @@ extension ChatMessageSendEx on ChatGeneralHandler {
     } catch (_) {}
   }
 
+  /// Send a template (rich card) message with title, content, icon, and link.
+  /// Used for sharing Solana content (NFT, music, events) in chat.
+  void sendTemplateMsg({
+    BuildContext? context,
+    String title = '',
+    String content = '',
+    String icon = '',
+    String link = '',
+  }) => _sendTemplateMessage(context: context, title: title, content: content, icon: icon, link: link);
+
   void _sendTemplateMessage({
     BuildContext? context,
     String title = '',

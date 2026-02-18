@@ -188,6 +188,7 @@ class AudiusTrack {
     'title': title,
     'artist': artistName,
     'artwork': artworkUrl ?? '',
+    'artwork_url': artworkUrl ?? '',
     'duration': duration,
     'share_url': shareUrl,
     'stream_url': streamUrl,

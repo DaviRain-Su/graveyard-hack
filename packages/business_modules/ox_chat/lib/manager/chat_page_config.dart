@@ -276,21 +276,23 @@ extension InputMoreItemEx on InputMoreItem {
             return;
           }
 
-          // Open NFT gallery in picker mode → on pick, send directly via handler
+          // Open NFT gallery in picker mode → on pick, send as rich card
           OXModuleService.pushPage(context, 'ox_solana', 'NftGalleryPage', {
             'pickerMode': true,
             'onNftSelected': (Map<String, dynamic> nft) {
               final name = nft['name'] ?? 'NFT';
               final collection = nft['collection'] ?? '';
               final mint = nft['mint'] ?? '';
+              final imageUrl = nft['imageUrl'] ?? '';
+              final explorerUrl = 'https://explorer.solana.com/address/$mint';
 
-              // Build share text with NFT info
-              final text = collection.isNotEmpty
-                  ? '🖼️ $name\n$collection\nhttps://explorer.solana.com/address/$mint'
-                  : '🖼️ $name\nhttps://explorer.solana.com/address/$mint';
-
-              // Send directly via handler's session — most reliable
-              handler.sendTextMessage(context, text);
+              handler.sendTemplateMsg(
+                context: context,
+                title: '🖼️ $name',
+                content: collection.isNotEmpty ? collection : 'Solana NFT • ${mint.substring(0, 8)}...',
+                icon: imageUrl,
+                link: explorerUrl,
+              );
             },
           });
         },
@@ -303,10 +305,9 @@ extension InputMoreItemEx on InputMoreItem {
         title: () => '🎵 Music',
         iconName: 'chat_more_icon.png', // reuse icon
         action: (context) {
-          // Open Audius in picker mode → on pick, send via handler
+          // Open Audius in picker mode → on pick, send as rich card
           OXModuleService.pushPage(context, 'ox_solana', 'AudiusPage', {
             'onTrackSelected': (dynamic track) {
-              // track arrives as Map<String,dynamic> from ox_solana module boundary
               Map<String, dynamic> trackMap;
               if (track is Map<String, dynamic>) {
                 trackMap = track;
@@ -319,12 +320,15 @@ extension InputMoreItemEx on InputMoreItem {
               final title = trackMap['title'] ?? 'Track';
               final artist = trackMap['artist'] ?? '';
               final shareUrl = trackMap['share_url'] ?? '';
+              final artworkUrl = trackMap['artwork_url'] ?? '';
 
-              // Build share text
-              final text = '🎵 $title\nby $artist\n$shareUrl';
-
-              // Send directly via handler's session
-              handler.sendTextMessage(context, text);
+              handler.sendTemplateMsg(
+                context: context,
+                title: '🎵 $title',
+                content: 'by $artist',
+                icon: artworkUrl,
+                link: shareUrl,
+              );
             },
           });
         },
@@ -351,9 +355,15 @@ extension InputMoreItemEx on InputMoreItem {
               final date = eventMap['display_start_at'] ?? '';
               final venue = eventMap['venue_name'] ?? '';
               final url = eventMap['share_url'] ?? '';
+              final imageUrl = eventMap['image_url'] ?? '';
 
-              final text = '🎫 $name\n📅 $date\n📍 $venue\n🔗 $url';
-              handler.sendTextMessage(context, text);
+              handler.sendTemplateMsg(
+                context: context,
+                title: '🎫 $name',
+                content: '📅 $date\n📍 $venue',
+                icon: imageUrl,
+                link: url,
+              );
             },
           });
         },
