@@ -174,6 +174,8 @@ extension UserCenterPageUI on UserCenterPageState{
                       OXWalletInterface.openWalletHomePage();
                     },
                   ),
+                  SizedBox(height: 12.px),
+                  _buildSolanaWalletOption(),
                   SizedBox(height: 24.px),
                   Container(
                     width: double.infinity,
@@ -555,6 +557,80 @@ extension UserCenterPageUI on UserCenterPageState{
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSolanaWalletOption() {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        OXModuleService.pushPage(
+          context,
+          'ox_solana',
+          'solanaWalletPage',
+          {},
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF9945FF).withOpacity(0.24),
+              const Color(0xFF14F195).withOpacity(0.24),
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.px, vertical: 10.px),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: Adapt.px(32),
+                    height: Adapt.px(32),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.account_balance_wallet,
+                      color: Colors.white,
+                      size: Adapt.px(18),
+                    ),
+                  ),
+                  SizedBox(width: Adapt.px(12)),
+                  Text(
+                    'Solana Wallet',
+                    style: TextStyle(
+                      color: ThemeColor.color0,
+                      fontSize: Adapt.px(16),
+                    ),
+                  ),
+                ],
+              ),
+              CommonImage(
+                iconName: 'icon_arrow_more.png',
+                width: Adapt.px(24),
+                height: Adapt.px(24),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

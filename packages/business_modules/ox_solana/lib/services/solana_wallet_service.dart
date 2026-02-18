@@ -178,6 +178,56 @@ class SolanaWalletService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Request devnet airdrop (1 SOL)
+  Future<String> requestAirdrop({double amount = 1.0}) async {
+    if (_keyPair == null || _client == null) {
+      throw Exception('Wallet not initialized');
+    }
+    if (!_isDevnet) {
+      throw Exception('Airdrop only available on devnet');
+    }
+
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final signature = await _client!.rpcClient.requestAirdrop(
+        address,
+        (amount * lamportsPerSol).toInt(),
+      );
+
+      if (kDebugMode) {
+        print('[OXSolana] Airdrop requested: $signature');
+      }
+
+      // Wait a bit then refresh balance
+      await Future.delayed(const Duration(seconds: 2));
+      await refreshBalance();
+
+      return signature;
+    } catch (e) {
+      _error = 'Airdrop failed: $e';
+      if (kDebugMode) print('[OXSolana] $_error');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Get explorer URL for a transaction
+  String getExplorerUrl(String signature) {
+    final cluster = _isDevnet ? '?cluster=devnet' : '';
+    return 'https://explorer.solana.com/tx/$signature$cluster';
+  }
+
+  /// Get explorer URL for the wallet address
+  String get addressExplorerUrl {
+    final cluster = _isDevnet ? '?cluster=devnet' : '';
+    return 'https://explorer.solana.com/address/$address$cluster';
+  }
+
   /// Get Nostr pubkey (for Tapestry binding)
   String? get nostrPubkey {
     try {

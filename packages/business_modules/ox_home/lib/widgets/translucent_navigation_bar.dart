@@ -87,7 +87,7 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
   bool _isLogin = false;
   Timer? _refreshMessagesTimer;
   int selectedIndex = 1;
-  double middleIndex = (5 / 2).floorToDouble();
+  double middleIndex = (4 / 2).floorToDouble();
 
   final List<TranslucentNavigationBarItem> _itemList = [];
 
@@ -136,7 +136,7 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
     _horizontalPadding = widget.horizontalPadding ?? 20.px;
     _verticalPadding = widget.verticalPadding ?? 24.px;
     // Always show 4 tabs: home, contact, discover, me
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
     _animation = Tween<double>(begin: 0.0, end: 72 + 24.px).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
     prepareMessageTimer();
@@ -517,21 +517,21 @@ class TranslucentNavigationBarState extends State<TranslucentNavigationBar> with
 
   @override
   void didMoveToTabBarCallBack() {
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
     dataInit();
   }
 
   @override
   void didMoveToTopCallBack() {
     // Always show 4 tabs: home, contact, discover, me
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
     dataInit();
   }
 
   @override
   void didDeleteMomentsCallBack() {
     // Always show 4 tabs: home, contact, discover, me
-    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.wallet, HomeTabBarType.me];
+    _typeList = [HomeTabBarType.home, HomeTabBarType.contact, HomeTabBarType.discover, HomeTabBarType.me];
     dataInit();
   }
 

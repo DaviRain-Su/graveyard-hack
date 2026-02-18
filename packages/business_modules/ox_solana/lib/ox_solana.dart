@@ -28,6 +28,7 @@ class OXSolana extends OXFlutterModule {
       BuildContext context, String pageName, Map<String, dynamic>? params) {
     switch (pageName) {
       case 'SolanaWalletPage':
+      case 'solanaWalletPage':
         return OXNavigator.pushPage(
             context, (ctx) => const SolanaWalletPage());
       case 'SendSolPage':
