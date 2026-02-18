@@ -179,12 +179,15 @@ class SolanaWalletService extends ChangeNotifier {
     // Load custom RPC before initializing client
     final prefs = await SharedPreferences.getInstance();
     _customMainnetRpc = prefs.getString(_customRpcKey);
-    final storedNetwork = prefs.getString(_networkKey);
-    if (storedNetwork != null) {
+    final storedNetwork = prefs.get(_networkKey);
+    if (storedNetwork is String) {
       _network = SolanaNetwork.values.firstWhere(
         (n) => n.name == storedNetwork,
         orElse: () => SolanaNetwork.mainnet,
       );
+    } else if (storedNetwork is bool) {
+      _network = storedNetwork ? SolanaNetwork.devnet : SolanaNetwork.mainnet;
+      await prefs.setString(_networkKey, _network.name);
     }
     _initClient();
     await _loadSavedWallet();
