@@ -5,6 +5,7 @@ import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 import 'package:ox_common/widgets/common_loading.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/solana_wallet_service.dart';
 import '../services/tapestry_service.dart';
@@ -256,6 +257,8 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
           if (!_walletService.isMainnet) ...[
             SizedBox(height: Adapt.px(16)),
             _buildAirdropButton(),
+            SizedBox(height: Adapt.px(10)),
+            _buildDemoTransferButton(),
           ],
           SizedBox(height: Adapt.px(24)),
 
@@ -728,6 +731,36 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     );
   }
 
+  Widget _buildDemoTransferButton() {
+    return GestureDetector(
+      onTap: _runDemoTransfer,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(vertical: Adapt.px(12)),
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+          border: Border.all(color: ThemeColor.color160),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bolt, color: ThemeColor.color0, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Run Demo Transfer (0.01 SOL → self)',
+              style: TextStyle(
+                color: ThemeColor.color0,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _requestAirdrop() async {
     try {
       OXLoading.show();
@@ -741,6 +774,88 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
       if (mounted) {
         CommonToast.instance.show(context, 'Airdrop failed: $e');
       }
+    }
+  }
+
+  Future<void> _runDemoTransfer() async {
+    HapticFeedback.lightImpact();
+    if (_walletService.balance < 0.011) {
+      CommonToast.instance.show(context, 'Balance too low. Request airdrop first.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text('Demo Transfer', style: TextStyle(color: ThemeColor.color0)),
+        content: Text(
+          'Send 0.01 SOL to your own address to prove on-chain transaction?\n\nNetwork: ${_walletService.networkName}',
+          style: TextStyle(color: ThemeColor.color100),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Send', style: TextStyle(color: Color(0xFF9945FF))),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      OXLoading.show();
+      final sig = await _walletService.sendSol(
+        toAddress: _walletService.address,
+        amount: 0.01,
+      );
+      final ok = await _walletService.waitForConfirmation(sig);
+      OXLoading.dismiss();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: ThemeColor.color180,
+            title: Text(ok ? 'Confirmed ✅' : 'Pending',
+                style: TextStyle(color: ThemeColor.color0)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Signature', style: TextStyle(color: ThemeColor.color110, fontSize: 12)),
+                SizedBox(height: 6),
+                Text(sig,
+                    style: TextStyle(color: ThemeColor.color0, fontFamily: 'monospace', fontSize: 12)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: sig));
+                  CommonToast.instance.show(context, 'Copied');
+                },
+                child: Text('Copy', style: TextStyle(color: ThemeColor.color100)),
+              ),
+              TextButton(
+                onPressed: () {
+                  final url = _walletService.getExplorerUrl(sig);
+                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                },
+                child: Text('Explorer', style: TextStyle(color: Color(0xFF9945FF))),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      OXLoading.dismiss();
+      CommonToast.instance.show(context, 'Demo transfer failed: $e');
     }
   }
 
