@@ -4,6 +4,7 @@ import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
 import 'package:ox_common/widgets/common_toast.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/transaction_record.dart';
 import '../services/solana_wallet_service.dart';
@@ -295,11 +296,16 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
 
             SizedBox(height: Adapt.px(20)),
 
-            // Explorer button
+            // Explorer buttons — Open + Copy
             GestureDetector(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: explorerUrl));
-                CommonToast.instance.show(context, 'Explorer URL copied!');
+              onTap: () async {
+                final uri = Uri.parse(explorerUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  Clipboard.setData(ClipboardData(text: explorerUrl));
+                  CommonToast.instance.show(context, 'Explorer URL copied!');
+                }
               },
               child: Container(
                 width: double.infinity,
@@ -314,13 +320,25 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                     Icon(Icons.open_in_new, size: 18, color: const Color(0xFF9945FF)),
                     SizedBox(width: 8),
                     Text(
-                      'Copy Explorer Link',
+                      'View in Solana Explorer',
                       style: TextStyle(
                         color: const Color(0xFF9945FF),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: explorerUrl));
+                CommonToast.instance.show(context, 'Explorer URL copied!');
+              },
+              child: Center(
+                child: Text('Copy Link',
+                  style: TextStyle(color: ThemeColor.color100, fontSize: 12, decoration: TextDecoration.underline),
                 ),
               ),
             ),

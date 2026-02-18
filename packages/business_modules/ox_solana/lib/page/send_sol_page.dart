@@ -216,6 +216,21 @@ class _SendSolPageState extends State<SendSolPage> {
     }
   }
 
+  Widget _buildConfirmRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: ThemeColor.color100, fontSize: 14)),
+        Flexible(
+          child: Text(value,
+            style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.end,
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _sendSol() async {
     final address = _addressController.text.trim();
     final amountStr = _amountController.text.trim();
@@ -224,8 +239,12 @@ class _SendSolPageState extends State<SendSolPage> {
       CommonToast.instance.show(context, 'Please enter recipient address');
       return;
     }
-    if (address.length < 32 || address.length > 44) {
+    if (!SolanaWalletService.isValidSolanaAddress(address)) {
       CommonToast.instance.show(context, 'Invalid Solana address');
+      return;
+    }
+    if (address == _walletService.address) {
+      CommonToast.instance.show(context, 'Cannot send to yourself');
       return;
     }
 
@@ -239,6 +258,41 @@ class _SendSolPageState extends State<SendSolPage> {
       return;
     }
 
+    // Confirmation dialog before sending
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text('Confirm Transfer', style: TextStyle(color: ThemeColor.color0)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildConfirmRow('To', '${address.substring(0, 6)}...${address.substring(address.length - 6)}'),
+            SizedBox(height: 10),
+            _buildConfirmRow('Amount', '$amount SOL'),
+            SizedBox(height: 10),
+            _buildConfirmRow('Network', _walletService.isDevnet ? 'Devnet' : 'Mainnet'),
+            SizedBox(height: 10),
+            _buildConfirmRow('Fee', '~0.000005 SOL'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9945FF)),
+            child: const Text('Confirm Send', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     setState(() => _isSending = true);
 
     try {
@@ -248,6 +302,10 @@ class _SendSolPageState extends State<SendSolPage> {
         amount: amount,
       );
       OXLoading.dismiss();
+
+      // Refresh balance after successful send
+      _walletService.refreshBalance();
+      _walletService.fetchTokens();
 
       if (mounted) {
         showDialog(

@@ -169,6 +169,18 @@ class _SendTokenPageState extends State<SendTokenPage> {
     );
   }
 
+  Widget _confirmRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: ThemeColor.color100, fontSize: 14)),
+        Flexible(
+          child: Text(value, style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600), textAlign: TextAlign.end),
+        ),
+      ],
+    );
+  }
+
   Future<void> _send() async {
     final address = _addressController.text.trim();
     final amountStr = _amountController.text.trim();
@@ -177,8 +189,12 @@ class _SendTokenPageState extends State<SendTokenPage> {
       CommonToast.instance.show(context, 'Enter recipient address');
       return;
     }
-    if (address.length < 32 || address.length > 44) {
+    if (!SolanaWalletService.isValidSolanaAddress(address)) {
       CommonToast.instance.show(context, 'Invalid Solana address');
+      return;
+    }
+    if (address == _walletService.address) {
+      CommonToast.instance.show(context, 'Cannot send to yourself');
       return;
     }
 
@@ -192,6 +208,41 @@ class _SendTokenPageState extends State<SendTokenPage> {
       return;
     }
 
+    // Confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text('Confirm Transfer', style: TextStyle(color: ThemeColor.color0)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _confirmRow('Token', widget.token.symbol),
+            SizedBox(height: 10),
+            _confirmRow('To', '${address.substring(0, 6)}...${address.substring(address.length - 6)}'),
+            SizedBox(height: 10),
+            _confirmRow('Amount', '$amountStr ${widget.token.symbol}'),
+            SizedBox(height: 10),
+            _confirmRow('Network', _walletService.isDevnet ? 'Devnet' : 'Mainnet'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9945FF)),
+            child: const Text('Confirm Send', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       OXLoading.show();
       final sig = await _walletService.sendSplToken(
@@ -201,6 +252,10 @@ class _SendTokenPageState extends State<SendTokenPage> {
         decimals: widget.token.decimals,
       );
       OXLoading.dismiss();
+
+      // Refresh balances
+      _walletService.refreshBalance();
+      _walletService.fetchTokens();
 
       if (mounted) {
         showDialog(

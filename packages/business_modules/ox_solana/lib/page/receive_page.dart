@@ -5,6 +5,7 @@ import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_appbar.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../services/solana_wallet_service.dart';
 
@@ -75,25 +76,46 @@ class ReceivePage extends StatelessWidget {
               ),
               SizedBox(height: Adapt.px(16)),
 
-              // Copy button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: address));
-                    CommonToast.instance.show(context, 'Address copied!');
-                  },
-                  icon: const Icon(Icons.copy, color: Colors.white, size: 18),
-                  label: const Text('Copy Address',
-                      style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9945FF),
-                    padding: EdgeInsets.symmetric(vertical: Adapt.px(14)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Adapt.px(12)),
+              // Copy + Share buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: address));
+                        CommonToast.instance.show(context, 'Address copied!');
+                      },
+                      icon: const Icon(Icons.copy, color: Colors.white, size: 18),
+                      label: const Text('Copy',
+                          style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF9945FF),
+                        padding: EdgeInsets.symmetric(vertical: Adapt.px(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(Adapt.px(12)),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Share.share('My Solana address: $address');
+                      },
+                      icon: const Icon(Icons.share, color: Colors.white, size: 18),
+                      label: const Text('Share',
+                          style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF14F195),
+                        padding: EdgeInsets.symmetric(vertical: Adapt.px(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(Adapt.px(12)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -358,53 +358,89 @@ class _SwapPageState extends State<SwapPage> {
     });
   }
 
+  /// Build combined token list: popular tokens + wallet's SPL tokens
+  List<SwapToken> _buildTokenList() {
+    final popular = List<SwapToken>.from(JupiterService.popularTokens);
+    final walletTokens = SolanaWalletService.instance.tokens;
+    final popularMints = popular.map((t) => t.mint).toSet();
+
+    // Add wallet tokens not already in popular list
+    for (final wt in walletTokens) {
+      if (!popularMints.contains(wt.mintAddress)) {
+        popular.add(SwapToken(
+          symbol: wt.symbol,
+          name: wt.symbol,
+          mint: wt.mintAddress,
+          decimals: wt.decimals,
+          logoChar: wt.symbol.isNotEmpty ? wt.symbol[0] : '?',
+        ));
+      }
+    }
+    return popular;
+  }
+
   void _selectToken({required bool isInput}) {
+    final allTokens = _buildTokenList();
+
     showModalBottomSheet(
       context: context,
       backgroundColor: ThemeColor.color190,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.all(Adapt.px(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Select Token',
-              style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 16),
-            ...JupiterService.popularTokens.map((token) {
-              final isSelected = isInput
-                  ? token.mint == _inputToken.mint
-                  : token.mint == _outputToken.mint;
-              return ListTile(
-                leading: _tokenIcon(token),
-                title: Text(token.symbol, style: TextStyle(color: ThemeColor.color0, fontWeight: FontWeight.w600)),
-                subtitle: Text(token.name, style: TextStyle(color: ThemeColor.color100, fontSize: 12)),
-                trailing: isSelected ? Icon(Icons.check, color: const Color(0xFF14F195)) : null,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() {
-                    if (isInput) {
-                      _inputToken = token;
-                      if (_outputToken.mint == token.mint) {
-                        _outputToken = JupiterService.popularTokens.firstWhere((t) => t.mint != token.mint);
-                      }
-                    } else {
-                      _outputToken = token;
-                      if (_inputToken.mint == token.mint) {
-                        _inputToken = JupiterService.popularTokens.firstWhere((t) => t.mint != token.mint);
-                      }
-                    }
-                    _quote = null;
-                  });
-                },
-              );
-            }),
-          ],
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.5,
+        maxChildSize: 0.8,
+        builder: (ctx, scrollController) => Padding(
+          padding: EdgeInsets.all(Adapt.px(16)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select Token',
+                style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: allTokens.length,
+                  itemBuilder: (ctx, i) {
+                    final token = allTokens[i];
+                    final isSelected = isInput
+                        ? token.mint == _inputToken.mint
+                        : token.mint == _outputToken.mint;
+                    return ListTile(
+                      leading: _tokenIcon(token),
+                      title: Text(token.symbol, style: TextStyle(color: ThemeColor.color0, fontWeight: FontWeight.w600)),
+                      subtitle: Text(token.name, style: TextStyle(color: ThemeColor.color100, fontSize: 12)),
+                      trailing: isSelected ? Icon(Icons.check, color: const Color(0xFF14F195)) : null,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          if (isInput) {
+                            _inputToken = token;
+                            if (_outputToken.mint == token.mint) {
+                              _outputToken = allTokens.firstWhere((t) => t.mint != token.mint, orElse: () => JupiterService.popularTokens[1]);
+                            }
+                          } else {
+                            _outputToken = token;
+                            if (_inputToken.mint == token.mint) {
+                              _inputToken = allTokens.firstWhere((t) => t.mint != token.mint, orElse: () => JupiterService.popularTokens[0]);
+                            }
+                          }
+                          _quote = null;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -37,9 +37,15 @@ class SolanaWalletService extends ChangeNotifier {
   String? _error;
   String? get error => _error;
 
-  // Solana RPC endpoints
-  static const String _mainnetRpc = 'https://api.mainnet-beta.solana.com';
-  static const String _devnetRpc = 'https://api.devnet.solana.com';
+  // Solana RPC endpoints — default public endpoints
+  // Override with setCustomRpc() for production (public endpoints have rate limits)
+  static const String _defaultMainnetRpc = 'https://api.mainnet-beta.solana.com';
+  static const String _defaultDevnetRpc = 'https://api.devnet.solana.com';
+  static const String _customRpcKey = 'ox_solana_custom_rpc';
+
+  String? _customMainnetRpc;
+  String get _mainnetRpc => _customMainnetRpc ?? _defaultMainnetRpc;
+  String get _devnetRpc => _defaultDevnetRpc;
 
   // Storage keys — private key & mnemonic go to SecureStorage (Keychain/Keystore)
   // Network preference stays in SharedPreferences (non-sensitive)
@@ -61,7 +67,36 @@ class SolanaWalletService extends ChangeNotifier {
 
   String get rpcUrl => _isDevnet ? _devnetRpc : _mainnetRpc;
 
+  /// Current effective RPC URL for display
+  String get effectiveRpcUrl => rpcUrl;
+
+  /// Whether a custom mainnet RPC is configured
+  bool get hasCustomRpc => _customMainnetRpc != null;
+
+  /// Set a custom mainnet RPC endpoint (for better rate limits)
+  /// Pass null to reset to default
+  Future<void> setCustomRpc(String? url) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (url != null && url.trim().isNotEmpty) {
+      _customMainnetRpc = url.trim();
+      await prefs.setString(_customRpcKey, _customMainnetRpc!);
+    } else {
+      _customMainnetRpc = null;
+      await prefs.remove(_customRpcKey);
+    }
+    _initClient();
+    if (_keyPair != null) {
+      await refreshBalance();
+    }
+    if (kDebugMode) {
+      print('[OXSolana] RPC updated: $rpcUrl');
+    }
+  }
+
   Future<void> init() async {
+    // Load custom RPC before initializing client
+    final prefs = await SharedPreferences.getInstance();
+    _customMainnetRpc = prefs.getString(_customRpcKey);
     _initClient();
     await _loadSavedWallet();
   }
@@ -115,13 +150,38 @@ class SolanaWalletService extends ChangeNotifier {
   String? exportMnemonic() => _mnemonic;
 
   /// Import wallet from mnemonic (BIP39)
+  /// Validate a Solana address (Base58 + 32 bytes)
+  static bool isValidSolanaAddress(String address) {
+    if (address.length < 32 || address.length > 44) return false;
+    try {
+      Ed25519HDPublicKey.fromBase58(address);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Validate a BIP39 mnemonic phrase
+  static bool isValidMnemonic(String mnemonic) {
+    final words = mnemonic.trim().split(RegExp(r'\s+'));
+    if (words.length != 12 && words.length != 24) return false;
+    return bip39.validateMnemonic(mnemonic.trim());
+  }
+
   Future<String> importFromMnemonic(String mnemonic) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      _mnemonic = mnemonic.trim();
+      final trimmed = mnemonic.trim();
+
+      // Validate mnemonic
+      if (!isValidMnemonic(trimmed)) {
+        throw Exception('Invalid mnemonic: must be 12 or 24 valid BIP39 words');
+      }
+
+      _mnemonic = trimmed;
       _keyPair = await Ed25519HDKeyPair.fromMnemonic(_mnemonic!);
       await _saveWallet();
       await refreshBalance();
@@ -141,7 +201,7 @@ class SolanaWalletService extends ChangeNotifier {
     }
   }
 
-  /// Refresh SOL balance
+  /// Refresh SOL balance and SPL token list
   Future<double> refreshBalance() async {
     if (_keyPair == null || _client == null) return 0;
 
@@ -150,6 +210,10 @@ class SolanaWalletService extends ChangeNotifier {
       _balance = lamports.value / lamportsPerSol;
       _error = null;
       notifyListeners();
+
+      // Also refresh token list in background
+      fetchTokens();
+
       return _balance;
     } catch (e) {
       _error = 'Failed to fetch balance: $e';

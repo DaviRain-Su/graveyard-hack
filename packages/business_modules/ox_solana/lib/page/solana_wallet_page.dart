@@ -217,6 +217,10 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
             SizedBox(height: Adapt.px(12)),
           ],
 
+          // RPC Settings
+          _buildRpcSetting(),
+          SizedBox(height: Adapt.px(12)),
+
           // Delete wallet
           _buildDeleteWalletButton(),
           SizedBox(height: Adapt.px(40)),
@@ -671,51 +675,87 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
 
   void _showImportDialog() {
     final controller = TextEditingController();
+    String? validationError;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColor.color180,
-        title: Text('Import Mnemonic',
-            style: TextStyle(color: ThemeColor.color0)),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          style: TextStyle(color: ThemeColor.color0),
-          decoration: InputDecoration(
-            hintText: 'Enter 12 or 24 word mnemonic...',
-            hintStyle: TextStyle(color: ThemeColor.color100),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final text = controller.text.trim();
+          final wordCount = text.isEmpty ? 0 : text.split(RegExp(r'\s+')).length;
+
+          return AlertDialog(
+            backgroundColor: ThemeColor.color180,
+            title: Text('Import Mnemonic',
+                style: TextStyle(color: ThemeColor.color0)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  maxLines: 3,
+                  style: TextStyle(color: ThemeColor.color0),
+                  onChanged: (_) => setDialogState(() {
+                    validationError = null;
+                  }),
+                  decoration: InputDecoration(
+                    hintText: 'Enter 12 or 24 word mnemonic...',
+                    hintStyle: TextStyle(color: ThemeColor.color100),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    errorText: validationError,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '$wordCount words entered${wordCount > 0 ? (wordCount == 12 || wordCount == 24 ? ' ✓' : ' (need 12 or 24)') : ''}',
+                  style: TextStyle(
+                    color: (wordCount == 12 || wordCount == 24) ? const Color(0xFF14F195) : ThemeColor.color100,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                OXLoading.show();
-                await _walletService
-                    .importFromMnemonic(controller.text.trim());
-                OXLoading.dismiss();
-                if (mounted) {
-                  CommonToast.instance.show(context, 'Wallet imported!');
-                }
-              } catch (e) {
-                OXLoading.dismiss();
-                if (mounted) {
-                  CommonToast.instance.show(context, 'Import failed: $e');
-                }
-              }
-            },
-            child: const Text('Import',
-                style: TextStyle(color: Color(0xFF9945FF))),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  // Validate first
+                  if (!SolanaWalletService.isValidMnemonic(text)) {
+                    setDialogState(() {
+                      validationError = wordCount != 12 && wordCount != 24
+                          ? 'Must be 12 or 24 words (got $wordCount)'
+                          : 'Invalid BIP39 mnemonic words';
+                    });
+                    return;
+                  }
+
+                  Navigator.pop(ctx);
+                  try {
+                    OXLoading.show();
+                    await _walletService.importFromMnemonic(text);
+                    OXLoading.dismiss();
+                    if (mounted) {
+                      CommonToast.instance.show(context, 'Wallet imported!');
+                    }
+                  } catch (e) {
+                    OXLoading.dismiss();
+                    if (mounted) {
+                      CommonToast.instance.show(context, 'Import failed: $e');
+                    }
+                  }
+                },
+                child: const Text('Import',
+                    style: TextStyle(color: Color(0xFF9945FF))),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -860,6 +900,107 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
             SizedBox(height: Adapt.px(16)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRpcSetting() {
+    return GestureDetector(
+      onTap: _showRpcSettingDialog,
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.dns_outlined, size: 18, color: ThemeColor.color100),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('RPC Endpoint', style: TextStyle(color: ThemeColor.color0, fontSize: 14)),
+                  SizedBox(height: 2),
+                  Text(
+                    _walletService.hasCustomRpc ? 'Custom RPC' : 'Default (public, rate-limited)',
+                    style: TextStyle(color: ThemeColor.color100, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRpcSettingDialog() {
+    final controller = TextEditingController(
+      text: _walletService.hasCustomRpc ? _walletService.effectiveRpcUrl : '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColor.color180,
+        title: Text('Mainnet RPC Endpoint', style: TextStyle(color: ThemeColor.color0)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Public RPC has strict rate limits. Use a custom RPC for better performance (e.g. Helius, QuickNode, Alchemy).',
+              style: TextStyle(color: ThemeColor.color100, fontSize: 12),
+            ),
+            SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: TextStyle(color: ThemeColor.color0, fontSize: 13, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                hintText: 'https://your-rpc-endpoint.com',
+                hintStyle: TextStyle(color: ThemeColor.color110, fontSize: 12),
+                filled: true,
+                fillColor: ThemeColor.color190,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (_walletService.hasCustomRpc)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _walletService.setCustomRpc(null);
+                if (mounted) {
+                  CommonToast.instance.show(context, 'Reset to default RPC');
+                }
+              },
+              child: Text('Reset', style: TextStyle(color: Colors.orange)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: ThemeColor.color100)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final url = controller.text.trim();
+              if (url.isEmpty || !url.startsWith('http')) {
+                CommonToast.instance.show(context, 'Enter a valid URL');
+                return;
+              }
+              Navigator.pop(ctx);
+              await _walletService.setCustomRpc(url);
+              if (mounted) {
+                CommonToast.instance.show(context, 'RPC endpoint updated');
+              }
+            },
+            child: Text('Save', style: TextStyle(color: const Color(0xFF9945FF))),
+          ),
+        ],
       ),
     );
   }
