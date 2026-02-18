@@ -146,7 +146,13 @@ class _SwapPageState extends State<SwapPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+              if (editable) _buildTokenBalance(token),
+            ],
+          ),
           SizedBox(height: 8),
           Row(
             children: [
@@ -246,6 +252,34 @@ class _SwapPageState extends State<SwapPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTokenBalance(SwapToken token) {
+    final wallet = SolanaWalletService.instance;
+    String bal = '—';
+
+    if (token.mint == JupiterService.solMint) {
+      bal = wallet.balance.toStringAsFixed(4);
+    } else {
+      // Look up SPL token balance
+      final match = wallet.tokens.where((t) => t.mintAddress == token.mint);
+      if (match.isNotEmpty) {
+        bal = match.first.balanceDisplay;
+      } else {
+        bal = '0';
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        _amountController.text = bal;
+        if (_quote != null) setState(() => _quote = null);
+      },
+      child: Text(
+        'Bal: $bal',
+        style: TextStyle(color: ThemeColor.color100, fontSize: 12),
       ),
     );
   }

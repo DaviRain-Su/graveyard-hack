@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:solana/solana.dart';
 import 'package:solana/dto.dart' hide Account;
+import 'package:bip39/bip39.dart' as bip39;
 import 'package:ox_common/utils/storage_key_tool.dart';
 import 'package:chatcore/chat-core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/spl_token_info.dart';
 import '../models/transaction_record.dart';
@@ -22,6 +24,9 @@ class SolanaWalletService extends ChangeNotifier {
   String get address => _keyPair?.address ?? '';
   bool get hasWallet => _keyPair != null;
 
+  /// Expose key pair for transaction signing (used by Jupiter swap)
+  Ed25519HDKeyPair? get keyPair => _keyPair;
+
   double _balance = 0;
   double get balance => _balance;
 
@@ -35,9 +40,20 @@ class SolanaWalletService extends ChangeNotifier {
   static const String _mainnetRpc = 'https://api.mainnet-beta.solana.com';
   static const String _devnetRpc = 'https://api.devnet.solana.com';
 
-  // Storage keys
+  // Storage keys — private key & mnemonic go to SecureStorage (Keychain/Keystore)
+  // Network preference stays in SharedPreferences (non-sensitive)
   static const String _keyStorageKey = 'ox_solana_private_key';
+  static const String _mnemonicStorageKey = 'ox_solana_mnemonic';
   static const String _networkKey = 'ox_solana_network';
+
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
+
+  String? _mnemonic;
+  /// Whether wallet was created from mnemonic (can be backed up)
+  bool get hasMnemonic => _mnemonic != null;
 
   bool _isDevnet = false;
   bool get isDevnet => _isDevnet;
@@ -66,19 +82,21 @@ class SolanaWalletService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Create a new Solana wallet (ed25519 key pair)
+  /// Create a new Solana wallet from a fresh BIP39 mnemonic
   Future<String> createWallet() async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      _keyPair = await Ed25519HDKeyPair.random();
+      // Generate 12-word mnemonic and derive keypair from it
+      _mnemonic = bip39.generateMnemonic();
+      _keyPair = await Ed25519HDKeyPair.fromMnemonic(_mnemonic!);
       await _saveWallet();
       await refreshBalance();
 
       if (kDebugMode) {
-        print('[OXSolana] Wallet created: $address');
+        print('[OXSolana] Wallet created from mnemonic: $address');
       }
 
       return address;
@@ -92,6 +110,9 @@ class SolanaWalletService extends ChangeNotifier {
     }
   }
 
+  /// Export mnemonic for backup (user must have created wallet from mnemonic)
+  String? exportMnemonic() => _mnemonic;
+
   /// Import wallet from mnemonic (BIP39)
   Future<String> importFromMnemonic(String mnemonic) async {
     try {
@@ -99,7 +120,8 @@ class SolanaWalletService extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _keyPair = await Ed25519HDKeyPair.fromMnemonic(mnemonic);
+      _mnemonic = mnemonic.trim();
+      _keyPair = await Ed25519HDKeyPair.fromMnemonic(_mnemonic!);
       await _saveWallet();
       await refreshBalance();
 
@@ -174,12 +196,20 @@ class SolanaWalletService extends ChangeNotifier {
     }
   }
 
-  /// Delete wallet
+  /// Delete wallet — removes all key material from secure storage
   Future<void> deleteWallet() async {
     _keyPair = null;
+    _mnemonic = null;
     _balance = 0;
+    _tokens = [];
+    _history = [];
+    // Clear from secure storage
+    await _secureStorage.delete(key: _keyStorageKey);
+    await _secureStorage.delete(key: _mnemonicStorageKey);
+    // Also clear any legacy SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyStorageKey);
+    await prefs.remove(_mnemonicStorageKey);
     notifyListeners();
   }
 
@@ -419,12 +449,25 @@ class SolanaWalletService extends ChangeNotifier {
 
   Future<void> _saveWallet() async {
     if (_keyPair == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    // Store the key pair bytes as base64
-    // In production, use secure storage (flutter_secure_storage)
+
+    // Private key → SecureStorage (Keychain on iOS/macOS, Keystore on Android)
     final keyBytes = await _keyPair!.extract();
     final encoded = base64Encode(keyBytes.bytes);
-    await prefs.setString(_keyStorageKey, encoded);
+    await _secureStorage.write(key: _keyStorageKey, value: encoded);
+
+    // Mnemonic → SecureStorage
+    if (_mnemonic != null) {
+      await _secureStorage.write(key: _mnemonicStorageKey, value: _mnemonic!);
+    }
+
+    // Migrate: clean up old SharedPreferences keys if they exist
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.containsKey(_keyStorageKey)) {
+      await prefs.remove(_keyStorageKey);
+    }
+    if (prefs.containsKey(_mnemonicStorageKey)) {
+      await prefs.remove(_mnemonicStorageKey);
+    }
   }
 
   Future<void> _loadSavedWallet() async {
@@ -432,7 +475,29 @@ class SolanaWalletService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _isDevnet = prefs.getBool(_networkKey) ?? false;
 
-      final encoded = prefs.getString(_keyStorageKey);
+      // Load from SecureStorage first, fallback to SharedPreferences (migration)
+      String? encoded = await _secureStorage.read(key: _keyStorageKey);
+      _mnemonic = await _secureStorage.read(key: _mnemonicStorageKey);
+
+      // Migration: move old SharedPreferences data to SecureStorage
+      if (encoded == null && prefs.containsKey(_keyStorageKey)) {
+        encoded = prefs.getString(_keyStorageKey);
+        _mnemonic ??= prefs.getString(_mnemonicStorageKey);
+        if (encoded != null) {
+          // Re-save to secure storage
+          await _secureStorage.write(key: _keyStorageKey, value: encoded);
+          if (_mnemonic != null) {
+            await _secureStorage.write(key: _mnemonicStorageKey, value: _mnemonic!);
+          }
+          // Remove from SharedPreferences
+          await prefs.remove(_keyStorageKey);
+          await prefs.remove(_mnemonicStorageKey);
+          if (kDebugMode) {
+            print('[OXSolana] Migrated keys from SharedPreferences to SecureStorage');
+          }
+        }
+      }
+
       if (encoded == null) return;
 
       final keyBytes = base64Decode(encoded);
@@ -441,7 +506,7 @@ class SolanaWalletService extends ChangeNotifier {
       );
 
       if (kDebugMode) {
-        print('[OXSolana] Wallet loaded: $address');
+        print('[OXSolana] Wallet loaded: $address (mnemonic: ${_mnemonic != null ? "yes" : "no"}, secure: ✅)');
       }
 
       await refreshBalance();

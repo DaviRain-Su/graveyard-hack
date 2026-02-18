@@ -6,6 +6,7 @@ import 'package:ox_common/widgets/common_toast.dart';
 
 import '../models/spl_token_info.dart';
 import '../services/solana_wallet_service.dart';
+import '../page/send_token_page.dart';
 
 /// Token list widget — displays SPL token holdings
 class TokenListWidget extends StatelessWidget {
@@ -349,7 +350,35 @@ class TokenListWidget extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: Adapt.px(24)),
+            SizedBox(height: Adapt.px(20)),
+
+            // Send button
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SendTokenPage(token: token)),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    'Send ${token.symbol}',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: Adapt.px(16)),
           ],
         ),
       ),

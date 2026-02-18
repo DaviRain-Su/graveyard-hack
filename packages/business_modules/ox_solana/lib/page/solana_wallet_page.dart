@@ -211,6 +211,12 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
             SizedBox(height: Adapt.px(16)),
           ],
 
+          // Backup recovery phrase
+          if (_walletService.hasMnemonic) ...[
+            _buildBackupButton(),
+            SizedBox(height: Adapt.px(12)),
+          ],
+
           // Delete wallet
           _buildDeleteWalletButton(),
           SizedBox(height: Adapt.px(40)),
@@ -549,59 +555,114 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
   }
 
   void _showWalletCreatedDialog() {
+    final mnemonic = _walletService.exportMnemonic();
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: ThemeColor.color180,
         title: Row(
           children: [
             Icon(Icons.check_circle, color: Color(0xFF14F195), size: 28),
             SizedBox(width: 8),
-            Text('Wallet Created!', style: TextStyle(color: ThemeColor.color0)),
+            Expanded(
+              child: Text('Wallet Created!', style: TextStyle(color: ThemeColor.color0)),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Your Solana address:',
-              style: TextStyle(color: ThemeColor.color100, fontSize: 13),
-            ),
-            SizedBox(height: 8),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ThemeColor.color190,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SelectableText(
-                _walletService.address,
-                style: TextStyle(
-                  color: ThemeColor.color0,
-                  fontSize: 12,
-                  fontFamily: 'monospace',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Recovery phrase
+              if (mnemonic != null) ...[
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: Colors.red[400], size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Back up your recovery phrase NOW! You cannot view it again after closing.',
+                          style: TextStyle(color: Colors.red[400], fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 12),
+                Text('Recovery Phrase:', style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+                SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: ThemeColor.color190,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: mnemonic.split(' ').asMap().entries.map((e) {
+                      return Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: ThemeColor.color180,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${e.key + 1}. ${e.value}',
+                          style: TextStyle(color: ThemeColor.color0, fontSize: 13, fontFamily: 'monospace'),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                SizedBox(height: 12),
+              ],
+
+              // Address
+              Text('Your Solana address:', style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+              SizedBox(height: 6),
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: ThemeColor.color190,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SelectableText(
+                  _walletService.address,
+                  style: TextStyle(color: ThemeColor.color0, fontSize: 11, fontFamily: 'monospace'),
                 ),
               ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              '🟠 You are on Devnet. Tap "Request Airdrop" to get free test SOL.',
-              style: TextStyle(color: Colors.orange, fontSize: 13),
-            ),
-          ],
+              SizedBox(height: 12),
+              Text(
+                '🟠 You are on Devnet. Tap "Request Airdrop" to get free test SOL.',
+                style: TextStyle(color: Colors.orange, fontSize: 12),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: _walletService.address));
-              CommonToast.instance.show(context, 'Address copied!');
-            },
-            child: Text('Copy Address', style: TextStyle(color: ThemeColor.color100)),
-          ),
+          if (mnemonic != null)
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: mnemonic));
+                CommonToast.instance.show(context, 'Recovery phrase copied! Store it safely.');
+              },
+              child: Text('Copy Phrase', style: TextStyle(color: Colors.red[400])),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('OK', style: TextStyle(color: Color(0xFF9945FF))),
+            child: Text('I\'ve Backed Up', style: TextStyle(color: Color(0xFF9945FF), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -683,6 +744,120 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
               ),
             ),
             Icon(Icons.copy, size: 16, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackupButton() {
+    return GestureDetector(
+      onTap: _showBackupMnemonic,
+      child: Container(
+        padding: EdgeInsets.all(Adapt.px(16)),
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          borderRadius: BorderRadius.circular(Adapt.px(12)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.shield_outlined, size: 18, color: Colors.orange),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Backup Recovery Phrase',
+                style: TextStyle(color: Colors.orange, fontSize: 14),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: ThemeColor.color100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBackupMnemonic() {
+    final mnemonic = _walletService.exportMnemonic();
+    if (mnemonic == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThemeColor.color190,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.all(Adapt.px(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.shield, color: Colors.orange, size: 24),
+                SizedBox(width: 10),
+                Text('Recovery Phrase',
+                    style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            SizedBox(height: 8),
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '⚠️ Never share your recovery phrase. Anyone with these words can access your funds.',
+                style: TextStyle(color: Colors.red[400], fontSize: 12),
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: ThemeColor.color180,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: mnemonic.split(' ').asMap().entries.map((e) {
+                  return Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: ThemeColor.color190,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${e.key + 1}. ${e.value}',
+                      style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontFamily: 'monospace'),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            SizedBox(height: 16),
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: mnemonic));
+                CommonToast.instance.show(context, 'Copied! Store it safely.');
+              },
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text('Copy Recovery Phrase',
+                      style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ),
+            SizedBox(height: Adapt.px(16)),
           ],
         ),
       ),

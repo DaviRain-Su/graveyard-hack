@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:solana/solana.dart';
+import 'package:solana/encoder.dart';
 
 import 'solana_wallet_service.dart';
 
@@ -93,7 +95,7 @@ class JupiterService {
     }
   }
 
-  /// Execute a full swap: quote → get tx → sign → send
+  /// Execute a full swap: quote → get tx → sign locally → send
   Future<String> executeSwap({
     required String inputMint,
     required String outputMint,
@@ -102,6 +104,9 @@ class JupiterService {
   }) async {
     final wallet = SolanaWalletService.instance;
     if (!wallet.hasWallet) throw Exception('Wallet not initialized');
+
+    final keyPair = wallet.keyPair;
+    if (keyPair == null) throw Exception('No key pair available');
 
     // 1. Get quote
     final quote = await getQuote(
@@ -112,35 +117,50 @@ class JupiterService {
     );
     if (quote == null) throw Exception('Failed to get swap quote');
 
-    // 2. Get serialized transaction
+    // 2. Get serialized transaction from Jupiter
     final swapTxBase64 = await getSwapTransaction(
       quoteResponse: quote.rawResponse,
       userPublicKey: wallet.address,
     );
     if (swapTxBase64 == null) throw Exception('Failed to build swap transaction');
 
-    // 3. Deserialize, sign, and send
+    // 3. Decode the VersionedTransaction, sign with our keypair, re-encode
     final txBytes = base64Decode(swapTxBase64);
+    final unsignedTx = SignedTx.fromBytes(txBytes);
+
+    // Extract message bytes and sign them
+    final messageBytes = unsignedTx.compiledMessage.toByteArray();
+    final signature = await keyPair.sign(messageBytes.toList());
+
+    // Rebuild SignedTx with our real signature replacing the placeholder
+    final signedTx = SignedTx(
+      signatures: [
+        signature,
+        ...unsignedTx.signatures.skip(1), // keep other signers if any
+      ],
+      compiledMessage: unsignedTx.compiledMessage,
+    );
+
+    // 4. Send signed transaction
     final client = SolanaClient(
       rpcUrl: Uri.parse(wallet.rpcUrl),
       websocketUrl: Uri.parse(wallet.rpcUrl.replaceFirst('https', 'wss')),
     );
 
-    // Send raw transaction
-    final signature = await client.rpcClient.sendTransaction(
-      base64Encode(txBytes),
+    final txId = await client.rpcClient.sendTransaction(
+      signedTx.encode(),
       preflightCommitment: Commitment.confirmed,
     );
 
     if (kDebugMode) {
-      print('[Jupiter] Swap executed: $signature');
+      print('[Jupiter] Swap executed: $txId');
     }
 
-    // Refresh balances
+    // 5. Refresh balances
     await wallet.refreshBalance();
     await wallet.fetchTokens();
 
-    return signature;
+    return txId;
   }
 }
 
