@@ -9,6 +9,7 @@ import 'package:ox_common/widgets/common_appbar.dart';
 import 'package:ox_common/widgets/common_toast.dart';
 
 import '../services/audius_service.dart';
+import '../services/audius_player_service.dart';
 
 /// Audius music page — browse, search, and **play** decentralized music
 class AudiusPage extends StatefulWidget {
@@ -27,53 +28,32 @@ class _AudiusPageState extends State<AudiusPage> {
   bool _isSearching = false;
   String _currentTab = 'trending';
 
-  // ── Audio Player ──
-  final AudioPlayer _player = AudioPlayer();
-  AudiusTrack? _currentTrack;
-  PlayerState _playerState = PlayerState.stopped;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  StreamSubscription? _stateSub;
-  StreamSubscription? _posSub;
-  StreamSubscription? _durSub;
+  // ── Global Audio Player (survives page navigation) ──
+  final _playerService = AudiusPlayerService.instance;
+
+  // Convenience getters that read from global service
+  AudiusTrack? get _currentTrack => _playerService.currentTrack;
+  PlayerState get _playerState => _playerService.playerState;
+  Duration get _position => _playerService.position;
+  Duration get _duration => _playerService.duration;
+  // Player is global via AudiusPlayerService — keeps playing when page is closed
 
   @override
   void initState() {
     super.initState();
     _loadTrending();
-    _setupPlayerListeners();
+    _playerService.addListener(_onPlayerChanged);
   }
 
-  void _setupPlayerListeners() {
-    _stateSub = _player.onPlayerStateChanged.listen((state) {
-      if (mounted) setState(() => _playerState = state);
-    });
-    _posSub = _player.onPositionChanged.listen((pos) {
-      if (mounted) setState(() => _position = pos);
-    });
-    _durSub = _player.onDurationChanged.listen((dur) {
-      if (mounted) setState(() => _duration = dur);
-    });
-    _player.onPlayerComplete.listen((_) {
-      // Auto-play next track
-      if (_currentTrack != null) {
-        final idx = _tracks.indexOf(_currentTrack!);
-        if (idx >= 0 && idx < _tracks.length - 1) {
-          _playTrack(_tracks[idx + 1]);
-        } else {
-          if (mounted) setState(() => _playerState = PlayerState.stopped);
-        }
-      }
-    });
+  void _onPlayerChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _stateSub?.cancel();
-    _posSub?.cancel();
-    _durSub?.cancel();
-    _player.dispose();
+    _playerService.removeListener(_onPlayerChanged);
     _searchController.dispose();
+    // NOTE: Do NOT dispose the player — it's global, keeps playing
     super.dispose();
   }
 
@@ -97,13 +77,7 @@ class _AudiusPageState extends State<AudiusPage> {
 
   Future<void> _playTrack(AudiusTrack track) async {
     try {
-      setState(() {
-        _currentTrack = track;
-        _position = Duration.zero;
-        _duration = Duration.zero;
-      });
-      await _player.stop();
-      await _player.play(UrlSource(track.streamUrl));
+      await _playerService.play(track, trackList: _tracks);
     } catch (e) {
       if (mounted) {
         CommonToast.instance.show(context, 'Playback error: $e');
@@ -112,31 +86,18 @@ class _AudiusPageState extends State<AudiusPage> {
   }
 
   Future<void> _togglePlayPause() async {
-    if (_playerState == PlayerState.playing) {
-      await _player.pause();
-    } else if (_currentTrack != null) {
-      await _player.resume();
-    }
+    await _playerService.togglePlayPause();
   }
 
   Future<void> _playNext() async {
-    if (_currentTrack == null) return;
-    final idx = _tracks.indexOf(_currentTrack!);
-    if (idx >= 0 && idx < _tracks.length - 1) {
-      _playTrack(_tracks[idx + 1]);
-    }
+    await _playerService.playNext();
   }
 
   Future<void> _playPrev() async {
-    if (_currentTrack == null) return;
-    // If > 3s into track, restart; otherwise go to previous
     if (_position.inSeconds > 3) {
-      await _player.seek(Duration.zero);
+      await _playerService.seek(Duration.zero);
     } else {
-      final idx = _tracks.indexOf(_currentTrack!);
-      if (idx > 0) {
-        _playTrack(_tracks[idx - 1]);
-      }
+      await _playerService.playPrev();
     }
   }
 
@@ -500,14 +461,13 @@ class _AudiusPageState extends State<AudiusPage> {
       ),
       builder: (ctx) => _NowPlayingSheet(
         track: track,
-        player: _player,
         playerState: _playerState,
         position: _position,
         duration: _duration,
         onTogglePlay: _togglePlayPause,
         onNext: _playNext,
         onPrev: _playPrev,
-        onSeek: (pos) => _player.seek(pos),
+        onSeek: (pos) => _playerService.seek(pos),
         onShare: widget.onTrackSelected != null
             ? () {
                 Navigator.pop(ctx);
@@ -633,7 +593,6 @@ class _AudiusPageState extends State<AudiusPage> {
 
 class _NowPlayingSheet extends StatefulWidget {
   final AudiusTrack track;
-  final AudioPlayer player;
   final PlayerState playerState;
   final Duration position;
   final Duration duration;
@@ -645,7 +604,6 @@ class _NowPlayingSheet extends StatefulWidget {
 
   const _NowPlayingSheet({
     required this.track,
-    required this.player,
     required this.playerState,
     required this.position,
     required this.duration,
@@ -661,33 +619,26 @@ class _NowPlayingSheet extends StatefulWidget {
 }
 
 class _NowPlayingSheetState extends State<_NowPlayingSheet> {
-  late PlayerState _state;
-  late Duration _pos;
-  late Duration _dur;
-  StreamSubscription? _sSub, _pSub, _dSub;
+  final _playerService = AudiusPlayerService.instance;
+
+  PlayerState get _state => _playerService.playerState;
+  Duration get _pos => _playerService.position;
+  Duration get _dur => _playerService.duration;
 
   @override
   void initState() {
     super.initState();
-    _state = widget.playerState;
-    _pos = widget.position;
-    _dur = widget.duration;
-    _sSub = widget.player.onPlayerStateChanged.listen((s) {
-      if (mounted) setState(() => _state = s);
-    });
-    _pSub = widget.player.onPositionChanged.listen((p) {
-      if (mounted) setState(() => _pos = p);
-    });
-    _dSub = widget.player.onDurationChanged.listen((d) {
-      if (mounted) setState(() => _dur = d);
-    });
+    _playerService.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
+  @override
   void dispose() {
-    _sSub?.cancel();
-    _pSub?.cancel();
-    _dSub?.cancel();
+    _playerService.removeListener(_onChanged);
     super.dispose();
   }
 

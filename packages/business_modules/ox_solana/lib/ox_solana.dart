@@ -26,6 +26,7 @@ import 'services/torque_service.dart';
 import 'page/torque_quests_page.dart';
 import 'services/kyd_service.dart';
 import 'page/kyd_events_page.dart';
+import 'widgets/floating_music_player.dart';
 
 class OXSolana extends OXFlutterModule {
   static final OXSolana shared = OXSolana._();
@@ -128,5 +129,7 @@ class OXSolana extends OXFlutterModule {
             ChatTransferService.showSendSolDialog(context,
                 recipientNostrPubkey: recipientNostrPubkey,
                 recipientName: recipientName),
+        // Floating music player widget (for home scaffold overlay)
+        'floatingMusicPlayer': () => const FloatingMusicPlayer(),
       };
 }

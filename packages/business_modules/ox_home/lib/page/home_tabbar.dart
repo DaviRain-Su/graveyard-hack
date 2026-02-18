@@ -98,10 +98,22 @@ class _HomeTabBarPageState extends State<HomeTabBarPage> with OXUserInfoObserver
           ),
         ),
       ),
-      body: PageView(
-        physics: const NeverScrollableScrollPhysics(),
-        controller: _pageController,
-        children: _containerView(context),
+      body: Stack(
+        children: [
+          PageView(
+            physics: const NeverScrollableScrollPhysics(),
+            controller: _pageController,
+            children: _containerView(context),
+          ),
+          // Floating music player overlay (from ox_solana)
+          Builder(builder: (ctx) {
+            try {
+              final widget = OXModuleService.invoke('ox_solana', 'floatingMusicPlayer', []);
+              if (widget is Widget) return widget;
+            } catch (_) {}
+            return const SizedBox.shrink();
+          }),
+        ],
       ),
     );
   }

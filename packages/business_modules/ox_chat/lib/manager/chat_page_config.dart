@@ -274,37 +274,21 @@ extension InputMoreItemEx on InputMoreItem {
             return;
           }
 
-          // Capture chat context before navigating
-          final chatContext = context;
-          final receiverPubkey = handler.otherUser?.pubKey ?? '';
-          final chatType = handler.session.chatType;
-          final isMultiUser = handler.session.hasMultipleUsers;
-
-          // Open NFT gallery in picker mode → on pick, send template message
+          // Open NFT gallery in picker mode → on pick, send directly via handler
           OXModuleService.pushPage(context, 'ox_solana', 'NftGalleryPage', {
             'pickerMode': true,
             'onNftSelected': (Map<String, dynamic> nft) {
               final name = nft['name'] ?? 'NFT';
               final collection = nft['collection'] ?? '';
               final mint = nft['mint'] ?? '';
-              final image = nft['imageUrl'] ?? '';
 
-              if (receiverPubkey.isEmpty && !isMultiUser) {
-                return;
-              }
+              // Build share text with NFT info
+              final text = collection.isNotEmpty
+                  ? '🖼️ $name\n$collection\nhttps://explorer.solana.com/address/$mint'
+                  : '🖼️ $name\nhttps://explorer.solana.com/address/$mint';
 
-              // NFT gallery pops itself, use delayed send with captured context
-              Future.delayed(const Duration(milliseconds: 300), () {
-                OXChatInterface.sendTemplateMessage(
-                  chatContext,
-                  receiverPubkey: receiverPubkey,
-                  title: '🖼️ $name',
-                  subTitle: collection.isNotEmpty ? '$collection\nsolana:nft:$mint' : 'solana:nft:$mint',
-                  icon: image,
-                  link: 'https://explorer.solana.com/address/$mint',
-                  chatType: chatType,
-                );
-              });
+              // Send directly via handler's session — most reliable
+              handler.sendTextMessage(context, text);
             },
           });
         },
@@ -317,13 +301,7 @@ extension InputMoreItemEx on InputMoreItem {
         title: () => '🎵 Music',
         iconName: 'chat_more_icon.png', // reuse icon
         action: (context) {
-          // Capture chat context BEFORE navigating away
-          final chatContext = context;
-          final receiverPubkey = handler.otherUser?.pubKey ?? '';
-          final chatType = handler.session.chatType;
-          final isMultiUser = handler.session.hasMultipleUsers;
-
-          // Open Audius in picker mode → on pick, send template message
+          // Open Audius in picker mode → on pick, send via handler
           OXModuleService.pushPage(context, 'ox_solana', 'AudiusPage', {
             'onTrackSelected': (dynamic track) {
               // track arrives as Map<String,dynamic> from ox_solana module boundary
@@ -338,27 +316,13 @@ extension InputMoreItemEx on InputMoreItem {
 
               final title = trackMap['title'] ?? 'Track';
               final artist = trackMap['artist'] ?? '';
-              final artwork = trackMap['artwork'] ?? '';
-              final shareUrl = trackMap['share_url'] ?? 'https://audius.co';
+              final shareUrl = trackMap['share_url'] ?? '';
 
-              if (receiverPubkey.isEmpty && !isMultiUser) {
-                return;
-              }
+              // Build share text
+              final text = '🎵 $title\nby $artist\n$shareUrl';
 
-              // Use captured chat context for sending message
-              // The AudiusPage already pops itself via Navigator.pop(context)
-              // so we just need to send the message using the original chat context
-              Future.delayed(const Duration(milliseconds: 300), () {
-                OXChatInterface.sendTemplateMessage(
-                  chatContext,
-                  receiverPubkey: receiverPubkey,
-                  title: '🎵 $title',
-                  subTitle: 'by $artist • audius.co',
-                  icon: artwork,
-                  link: shareUrl,
-                  chatType: chatType,
-                );
-              });
+              // Send directly via handler's session
+              handler.sendTextMessage(context, text);
             },
           });
         },
