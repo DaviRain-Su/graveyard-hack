@@ -130,6 +130,27 @@ class OXSolana extends OXFlutterModule {
         ));
       case 'DappConnectPage':
         return OXNavigator.pushPage(context, (ctx) => const DappConnectPage());
+      case 'KydEventsPage':
+        final onEventSelected = params?['onEventSelected'];
+        if (onEventSelected != null) {
+          return OXNavigator.pushPage(
+            context,
+            (ctx) => KydEventsPage(
+              onEventSelected: (event) {
+                // Convert KydEvent to Map at module boundary
+                onEventSelected({
+                  'name': event.name,
+                  'display_start_at': event.displayStartAt ?? '',
+                  'venue_name': event.venue?.name ?? '',
+                  'share_url': KydService.instance.getShareUrl(event),
+                  'image_url': event.imageUrl ?? '',
+                  'id': event.id,
+                });
+              },
+            ),
+          );
+        }
+        return OXNavigator.pushPage(context, (ctx) => const KydEventsPage());
     }
     return null;
   }

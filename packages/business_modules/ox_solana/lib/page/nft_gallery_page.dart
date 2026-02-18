@@ -18,15 +18,34 @@ class NftGalleryPage extends StatefulWidget {
   State<NftGalleryPage> createState() => _NftGalleryPageState();
 }
 
-class _NftGalleryPageState extends State<NftGalleryPage> {
+class _NftGalleryPageState extends State<NftGalleryPage> with SingleTickerProviderStateMixin {
   List<SolanaNft> _nfts = [];
+  List<DripDrop> _dripDrops = [];
   bool _isLoading = true;
+  bool _isLoadingDrops = false;
   String? _error;
+  late TabController _tabController;
+  int _currentTab = 0;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: widget.pickerMode ? 1 : 3, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.index != _currentTab) {
+        setState(() => _currentTab = _tabController.index);
+        if (_tabController.index == 2 && _dripDrops.isEmpty) {
+          _loadDripDrops();
+        }
+      }
+    });
     _loadNfts();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNfts() async {
@@ -39,21 +58,57 @@ class _NftGalleryPageState extends State<NftGalleryPage> {
     if (mounted) setState(() => _isLoading = false);
   }
 
+  Future<void> _loadDripDrops() async {
+    setState(() => _isLoadingDrops = true);
+    _dripDrops = await DripService.instance.fetchRecentDrops();
+    if (mounted) setState(() => _isLoadingDrops = false);
+  }
+
+  List<SolanaNft> get _dripNfts => DripService.instance.filterDripNfts(_nfts);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: CommonAppBar(
-        title: widget.pickerMode ? '🖼️ Pick NFT to Share' : '🖼️ NFT Gallery',
+      appBar: AppBar(
         backgroundColor: ThemeColor.color190,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          widget.pickerMode ? '🖼️ Pick NFT to Share' : '🖼️ NFT Gallery',
+          style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh, color: ThemeColor.color100),
             onPressed: _loadNfts,
           ),
         ],
+        bottom: widget.pickerMode ? null : TabBar(
+          controller: _tabController,
+          indicatorColor: Color(0xFF9945FF),
+          labelColor: Color(0xFF9945FF),
+          unselectedLabelColor: ThemeColor.color100,
+          tabs: [
+            Tab(text: 'All NFTs'),
+            Tab(text: '💧 DRiP'),
+            Tab(text: '🔍 Discover'),
+          ],
+        ),
       ),
-      body: _buildBody(),
+      body: widget.pickerMode
+          ? _buildBody()
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildBody(),
+                _buildDripTab(),
+                _buildDiscoverTab(),
+              ],
+            ),
     );
   }
 
@@ -128,6 +183,219 @@ class _NftGalleryPageState extends State<NftGalleryPage> {
         ),
         itemCount: _nfts.length,
         itemBuilder: (ctx, i) => _buildNftCard(_nfts[i]),
+      ),
+    );
+  }
+
+  Widget _buildDripTab() {
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator(color: Color(0xFF9945FF)));
+    }
+
+    final dripNfts = _dripNfts;
+
+    return Column(
+      children: [
+        // DRiP branding header
+        Container(
+          margin: EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1B0B3B), Color(0xFF2D1B69)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Color(0xFF9945FF).withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: Color(0xFF9945FF).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(child: Text('💧', style: TextStyle(fontSize: 24))),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('DRiP Collection', style: TextStyle(
+                      color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('${dripNfts.length} free collectibles from drip.haus',
+                      style: TextStyle(color: Colors.white60, fontSize: 12)),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => launchUrl(Uri.parse(DripService.instance.browseUrl),
+                    mode: LaunchMode.externalApplication),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF14F195),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('Browse', style: TextStyle(
+                    color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // DRiP NFT grid
+        Expanded(
+          child: dripNfts.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('💧', style: TextStyle(fontSize: 48)),
+                      SizedBox(height: 12),
+                      Text('No DRiP NFTs yet', style: TextStyle(
+                        color: ThemeColor.color0, fontSize: 16, fontWeight: FontWeight.w600)),
+                      SizedBox(height: 8),
+                      Text('Visit drip.haus to collect free Solana art',
+                        style: TextStyle(color: ThemeColor.color100, fontSize: 13)),
+                      SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => launchUrl(Uri.parse(DripService.instance.browseUrl),
+                            mode: LaunchMode.externalApplication),
+                        style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF9945FF)),
+                        child: Text('Go to DRiP', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                )
+              : GridView.builder(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10, mainAxisSpacing: 10,
+                    childAspectRatio: 0.8,
+                  ),
+                  itemCount: dripNfts.length,
+                  itemBuilder: (ctx, i) => _buildNftCard(dripNfts[i]),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiscoverTab() {
+    if (_isLoadingDrops) {
+      return Center(child: CircularProgressIndicator(color: Color(0xFF9945FF)));
+    }
+
+    return Column(
+      children: [
+        // Header
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            children: [
+              Text('🔥 Recent Drops', style: TextStyle(
+                color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.bold)),
+              Spacer(),
+              GestureDetector(
+                onTap: _loadDripDrops,
+                child: Icon(Icons.refresh, color: ThemeColor.color100, size: 20),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _dripDrops.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🔍', style: TextStyle(fontSize: 48)),
+                      SizedBox(height: 12),
+                      Text('Discover new DRiP drops', style: TextStyle(
+                        color: ThemeColor.color0, fontSize: 16)),
+                      SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: () => launchUrl(Uri.parse(DripService.instance.browseUrl),
+                            mode: LaunchMode.externalApplication),
+                        style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF9945FF)),
+                        child: Text('Open drip.haus', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: _dripDrops.length,
+                  itemBuilder: (ctx, i) => _buildDropCard(_dripDrops[i]),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropCard(DripDrop drop) {
+    return GestureDetector(
+      onTap: () => launchUrl(Uri.parse(drop.collectUrl),
+          mode: LaunchMode.externalApplication),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.horizontal(left: Radius.circular(12)),
+              child: drop.imageUrl != null
+                  ? Image.network(drop.imageUrl!, width: 80, height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 80, height: 80,
+                        color: Color(0xFF9945FF).withOpacity(0.2),
+                        child: Center(child: Text('💧', style: TextStyle(fontSize: 28))),
+                      ))
+                  : Container(
+                      width: 80, height: 80,
+                      color: Color(0xFF9945FF).withOpacity(0.2),
+                      child: Center(child: Text('💧', style: TextStyle(fontSize: 28))),
+                    ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(drop.name, style: TextStyle(
+                    color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (drop.creatorName != null) ...[
+                    SizedBox(height: 2),
+                    Text('by ${drop.creatorName!}', style: TextStyle(
+                      color: ThemeColor.color100, fontSize: 12)),
+                  ],
+                  SizedBox(height: 4),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF14F195).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text('FREE • Collect on DRiP', style: TextStyle(
+                      color: Color(0xFF14F195), fontSize: 10, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ThemeColor.color110),
+            SizedBox(width: 8),
+          ],
+        ),
       ),
     );
   }

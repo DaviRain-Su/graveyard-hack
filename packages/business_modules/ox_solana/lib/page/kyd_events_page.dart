@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ox_common/utils/adapt.dart';
 import 'package:ox_common/utils/theme_color.dart';
 import 'package:ox_common/widgets/common_loading.dart';
@@ -7,7 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/kyd_service.dart';
 
 class KydEventsPage extends StatefulWidget {
-  const KydEventsPage({Key? key}) : super(key: key);
+  /// Optional: if set, the page is in "share picker" mode for chat
+  final Function(KydEvent event)? onEventSelected;
+
+  const KydEventsPage({Key? key, this.onEventSelected}) : super(key: key);
 
   @override
   State<KydEventsPage> createState() => _KydEventsPageState();
@@ -613,30 +617,85 @@ class _KydEventsPageState extends State<KydEventsPage> {
                   SizedBox(height: 20.px),
                 ],
 
-                // CTA Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 52.px,
-                  child: ElevatedButton(
-                    onPressed: () => _openInBrowser(event.id),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: event.isSoldOut
-                          ? ThemeColor.color160
-                          : Color(0xFFA1FFFF),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                // CTA Buttons
+                Row(
+                  children: [
+                    // Main CTA
+                    Expanded(
+                      child: SizedBox(
+                        height: 52.px,
+                        child: ElevatedButton(
+                          onPressed: () => _openInBrowser(event.id),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: event.isSoldOut
+                                ? ThemeColor.color160
+                                : Color(0xFFA1FFFF),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            event.isSoldOut
+                                ? 'Join Waitlist'
+                                : 'Get Tickets on KYD',
+                            style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      event.isSoldOut
-                          ? 'Join Waitlist'
-                          : 'Get Tickets on KYD',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    SizedBox(width: 10),
+                    // Share button
+                    SizedBox(
+                      height: 52.px,
+                      width: 52.px,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          if (widget.onEventSelected != null) {
+                            widget.onEventSelected!(event);
+                            Navigator.pop(context);
+                          } else {
+                            _shareEvent(event);
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Color(0xFFA1FFFF).withOpacity(0.5)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: Icon(
+                          widget.onEventSelected != null ? Icons.send : Icons.share,
+                          color: Color(0xFFA1FFFF),
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Add to Calendar
+                if (event.startAt != null) ...[
+                  SizedBox(height: 12.px),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44.px,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _addToCalendar(event),
+                      icon: Icon(Icons.calendar_month, size: 18, color: ThemeColor.color0),
+                      label: Text('Add to Calendar',
+                          style: TextStyle(color: ThemeColor.color0, fontSize: 14)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: ThemeColor.color160),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
 
                 SizedBox(height: 40.px),
               ],
@@ -784,6 +843,31 @@ class _KydEventsPageState extends State<KydEventsPage> {
         ],
       ),
     );
+  }
+
+  void _shareEvent(KydEvent event) {
+    final url = KydService.instance.getShareUrl(event);
+    final text = '🎫 ${_cleanEventName(event.name)}\n'
+        '📅 ${event.displayStartAt ?? _formatDate(event.startAt)}\n'
+        '📍 ${event.venue?.name ?? 'TBA'}\n'
+        '🔗 $url';
+    Clipboard.setData(ClipboardData(text: text));
+    CommonToast.instance.show(context, 'Event info copied! 📋');
+  }
+
+  void _addToCalendar(KydEvent event) {
+    if (event.startAt == null) return;
+    // Use Google Calendar web link (universal, works on iOS + Android)
+    final start = event.startAt!.toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').replaceAll('.000', '');
+    final end = (event.endAt ?? event.startAt!.add(const Duration(hours: 3))).toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').replaceAll('.000', '');
+    final calUrl = Uri.parse(
+      'https://calendar.google.com/calendar/render?action=TEMPLATE'
+      '&text=${Uri.encodeComponent(_cleanEventName(event.name))}'
+      '&dates=$start/$end'
+      '&location=${Uri.encodeComponent(event.venue?.name ?? '')}'
+      '&details=${Uri.encodeComponent('KYD Tickets: ${KydService.instance.getEventWebUrl(event.id)}')}',
+    );
+    launchUrl(calUrl, mode: LaunchMode.externalApplication);
   }
 
   String _cleanEventName(String name) {

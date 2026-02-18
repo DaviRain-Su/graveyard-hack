@@ -56,6 +56,8 @@ class ChatPageConfig {
       InputMoreItemEx.shareNft(handler),
       // Share Audius music in chat
       InputMoreItemEx.shareMusic(handler),
+      // Share KYD event in chat
+      InputMoreItemEx.shareEvent(handler),
     ];
 
     final otherUser = handler.otherUser;
@@ -322,6 +324,35 @@ extension InputMoreItemEx on InputMoreItem {
               final text = '🎵 $title\nby $artist\n$shareUrl';
 
               // Send directly via handler's session
+              handler.sendTextMessage(context, text);
+            },
+          });
+        },
+      );
+
+  static InputMoreItem shareEvent(ChatGeneralHandler handler) =>
+      InputMoreItem(
+        id: 'shareEvent',
+        title: () => '🎫 Event',
+        iconName: 'chat_more_icon.png',
+        action: (context) {
+          OXModuleService.pushPage(context, 'ox_solana', 'KydEventsPage', {
+            'onEventSelected': (dynamic event) {
+              Map<String, dynamic> eventMap;
+              if (event is Map<String, dynamic>) {
+                eventMap = event;
+              } else if (event is Map) {
+                eventMap = Map<String, dynamic>.from(event);
+              } else {
+                eventMap = {};
+              }
+
+              final name = eventMap['name'] ?? 'Event';
+              final date = eventMap['display_start_at'] ?? '';
+              final venue = eventMap['venue_name'] ?? '';
+              final url = eventMap['share_url'] ?? '';
+
+              final text = '🎫 $name\n📅 $date\n📍 $venue\n🔗 $url';
               handler.sendTextMessage(context, text);
             },
           });

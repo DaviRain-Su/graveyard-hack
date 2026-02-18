@@ -276,3 +276,103 @@ class NftAttribute {
   final String value;
   const NftAttribute({required this.trait, required this.value});
 }
+
+/// DRiP integration — free Solana NFT drops (drip.haus)
+///
+/// DRiP distributes cNFT (compressed NFTs) on Solana. Users can:
+/// 1. Browse their DRiP collection (filtered from wallet NFTs)
+/// 2. Discover new drops on drip.haus
+/// 3. Share DRiP NFTs in chat
+class DripService {
+  static final DripService instance = DripService._();
+  DripService._();
+
+  /// Known DRiP collection addresses (compressed NFT collections)
+  static const Set<String> dripCreators = {
+    'DRiP2Pn2K6fuMLKQmt5rZWyHiUZ6WK3GChEySUpHSS4x', // DRiP main
+    'Drip5PzqsKXrY32QVYe4KKrmNveA4pCovy36NUjXKnMW', // DRiP alt
+  };
+
+  /// DRiP web base for browsing drops
+  static const String _webBase = 'https://drip.haus';
+
+  /// Filter DRiP NFTs from a wallet's full NFT list
+  List<SolanaNft> filterDripNfts(List<SolanaNft> allNfts) {
+    return allNfts.where((nft) {
+      // Check if collection matches DRiP creators
+      if (nft.collection != null && dripCreators.contains(nft.collection)) {
+        return true;
+      }
+      // Check name pattern (DRiP NFTs often have "DRiP" in name)
+      if (nft.name.toLowerCase().contains('drip')) return true;
+      return false;
+    }).toList();
+  }
+
+  /// Fetch DRiP drops feed from web (recent drops)
+  Future<List<DripDrop>> fetchRecentDrops() async {
+    try {
+      // Use drip.haus API for discovery
+      final response = await http.get(
+        Uri.parse('$_webBase/api/drops?limit=20'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final drops = (data['drops'] as List? ?? data as List? ?? []);
+        return drops
+            .take(20)
+            .map<DripDrop>((d) => DripDrop.fromJson(d))
+            .toList();
+      }
+    } catch (e) {
+      if (kDebugMode) print('[DRiP] Fetch drops error: $e');
+    }
+    return [];
+  }
+
+  /// URL to collect a DRiP drop
+  String getCollectUrl(String dropId) => '$_webBase/drops/$dropId';
+
+  /// URL for DRiP creator page
+  String getCreatorUrl(String creatorSlug) => '$_webBase/creators/$creatorSlug';
+
+  /// Browse DRiP homepage
+  String get browseUrl => _webBase;
+}
+
+class DripDrop {
+  final String id;
+  final String name;
+  final String? imageUrl;
+  final String? creatorName;
+  final String? creatorSlug;
+  final String? description;
+  final DateTime? createdAt;
+  final int? editions;
+
+  DripDrop({
+    required this.id,
+    required this.name,
+    this.imageUrl,
+    this.creatorName,
+    this.creatorSlug,
+    this.description,
+    this.createdAt,
+    this.editions,
+  });
+
+  factory DripDrop.fromJson(Map<String, dynamic> j) => DripDrop(
+        id: (j['id'] ?? j['slug'] ?? '').toString(),
+        name: j['name'] ?? j['title'] ?? 'DRiP Drop',
+        imageUrl: j['image'] ?? j['image_url'] ?? j['thumbnail'],
+        creatorName: j['creator']?['name'] ?? j['creator_name'],
+        creatorSlug: j['creator']?['slug'] ?? j['creator_slug'],
+        description: j['description'],
+        createdAt: DateTime.tryParse(j['created_at'] ?? ''),
+        editions: j['editions'] as int?,
+      );
+
+  String get collectUrl => DripService.instance.getCollectUrl(id);
+}
