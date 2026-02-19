@@ -41,32 +41,57 @@ class _MiniAppContainerState extends State<MiniAppContainer> {
 
   @override
   Widget build(BuildContext context) {
-    final body = GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragStart: (details) {
-        _canDrag = details.localPosition.dy < 80; // top swipe only
-        _dragDistance = 0;
-        if (_canDrag) {
-          setState(() => _showHint = true);
-        }
-      },
-      onVerticalDragUpdate: (details) {
-        if (!_canDrag) return;
-        if (details.delta.dy > 0) {
-          _dragDistance += details.delta.dy;
-          if (_dragDistance > 80) {
-            _minimizeIfNeeded();
-          } else {
-            if (!_showHint) setState(() => _showHint = true);
-          }
-        }
-      },
-      onVerticalDragEnd: (_) {
-        _dragDistance = 0;
-        _canDrag = false;
-        if (_showHint) setState(() => _showHint = false);
-      },
-      child: widget.child,
+    final body = Stack(
+      children: [
+        NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (!widget.enableMinimize || widget.session == null) return false;
+            if (notification is OverscrollNotification && notification.overscroll < 0) {
+              _dragDistance += -notification.overscroll;
+              if (!_showHint) setState(() => _showHint = true);
+              if (_dragDistance > 80) {
+                _minimizeIfNeeded();
+              }
+            }
+            if (notification is ScrollEndNotification) {
+              _dragDistance = 0;
+              if (_showHint) setState(() => _showHint = false);
+            }
+            return false;
+          },
+          child: widget.child,
+        ),
+        // Top swipe area (works even when not scrolling)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 60,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (details) {
+              _canDrag = true;
+              _dragDistance = 0;
+              if (!_showHint) setState(() => _showHint = true);
+            },
+            onVerticalDragUpdate: (details) {
+              if (!_canDrag) return;
+              if (details.delta.dy > 0) {
+                _dragDistance += details.delta.dy;
+                if (_dragDistance > 80) {
+                  _minimizeIfNeeded();
+                }
+              }
+            },
+            onVerticalDragEnd: (_) {
+              _dragDistance = 0;
+              _canDrag = false;
+              if (_showHint) setState(() => _showHint = false);
+            },
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ],
     );
 
     return Scaffold(
