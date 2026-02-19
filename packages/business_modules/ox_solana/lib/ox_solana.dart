@@ -29,6 +29,7 @@ import 'services/kyd_service.dart';
 import 'page/kyd_events_page.dart';
 import 'widgets/floating_music_player.dart';
 import 'widgets/mini_app_container.dart';
+import 'services/mini_app_manager.dart';
 
 class OXSolana extends OXFlutterModule {
   static final OXSolana shared = OXSolana._();
@@ -106,6 +107,11 @@ class OXSolana extends OXFlutterModule {
           context,
           (ctx) => MiniAppContainer(
             title: 'Swap',
+            session: MiniAppSession(
+              module: moduleName,
+              pageName: 'SwapPage',
+              title: 'Swap',
+            ),
             child: SwapPage(showAppBar: false),
           ),
         );
@@ -130,10 +136,24 @@ class OXSolana extends OXFlutterModule {
             }
           };
         }
+        final session = rawCallback == null
+            ? MiniAppSession(
+                module: moduleName,
+                pageName: 'AudiusPage',
+                title: 'Audius',
+                params: {
+                  'autoPlayTitle': params?['autoPlayTitle'],
+                  'autoPlayArtist': params?['autoPlayArtist'],
+                  'autoPlay': params?['autoPlay'] == true,
+                },
+              )
+            : null;
         return OXNavigator.pushPage(
             context,
             (ctx) => MiniAppContainer(
                   title: 'Audius',
+                  session: session,
+                  enableMinimize: rawCallback == null,
                   child: AudiusPage(
                     onTrackSelected: typedCallback,
                     autoPlayTitle: params?['autoPlayTitle'],
@@ -143,12 +163,25 @@ class OXSolana extends OXFlutterModule {
                   ),
                 ));
       case 'NftGalleryPage':
+        final pickerMode = params?['pickerMode'] ?? false;
+        final session = !pickerMode
+            ? MiniAppSession(
+                module: moduleName,
+                pageName: 'NftGalleryPage',
+                title: 'NFT Gallery',
+                params: {
+                  'mint': params?['mint'],
+                },
+              )
+            : null;
         return OXNavigator.pushPage(
           context,
           (ctx) => MiniAppContainer(
             title: 'NFT Gallery',
+            session: session,
+            enableMinimize: !pickerMode,
             child: NftGalleryPage(
-              pickerMode: params?['pickerMode'] ?? false,
+              pickerMode: pickerMode,
               onNftSelected: params?['onNftSelected'],
               focusMint: params?['mint'],
               showAppBar: false,
@@ -160,6 +193,11 @@ class OXSolana extends OXFlutterModule {
           context,
           (ctx) => MiniAppContainer(
             title: 'DApp Connect',
+            session: MiniAppSession(
+              module: moduleName,
+              pageName: 'DappConnectPage',
+              title: 'DApp Connect',
+            ),
             child: DappConnectPage(showAppBar: false),
           ),
         );
@@ -168,6 +206,11 @@ class OXSolana extends OXFlutterModule {
           context,
           (ctx) => MiniAppContainer(
             title: 'Torque Quests',
+            session: MiniAppSession(
+              module: moduleName,
+              pageName: 'TorqueQuestsPage',
+              title: 'Torque Quests',
+            ),
             child: TorqueQuestsPage(showAppBar: false),
           ),
         );
@@ -178,6 +221,7 @@ class OXSolana extends OXFlutterModule {
             context,
             (ctx) => MiniAppContainer(
               title: 'KYD Events',
+              enableMinimize: false,
               child: KydEventsPage(
                 onEventSelected: (event) {
                   // Convert KydEvent to Map at module boundary
@@ -195,10 +239,19 @@ class OXSolana extends OXFlutterModule {
             ),
           );
         }
+        final session = MiniAppSession(
+          module: moduleName,
+          pageName: 'KydEventsPage',
+          title: 'KYD Events',
+          params: {
+            'eventId': params?['eventId'],
+          },
+        );
         return OXNavigator.pushPage(
           context,
           (ctx) => MiniAppContainer(
             title: 'KYD Events',
+            session: session,
             child: KydEventsPage(
               eventId: params?['eventId'],
               showAppBar: false,

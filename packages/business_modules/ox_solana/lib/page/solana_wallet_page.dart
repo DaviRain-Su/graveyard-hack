@@ -12,6 +12,7 @@ import '../services/solana_wallet_service.dart';
 import '../services/tapestry_service.dart';
 import 'demo_checklist_page.dart';
 import '../widgets/mini_app_container.dart';
+import '../services/mini_app_manager.dart';
 import '../services/price_service.dart';
 import '../widgets/token_list_widget.dart';
 import 'send_sol_page.dart';
@@ -252,6 +253,11 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                     MaterialPageRoute(
                       builder: (_) => MiniAppContainer(
                         title: 'Swap',
+                        session: MiniAppSession(
+                          module: 'ox_solana',
+                          pageName: 'SwapPage',
+                          title: 'Swap',
+                        ),
                         child: SwapPage(showAppBar: false),
                       ),
                     ),
@@ -1395,6 +1401,11 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         MaterialPageRoute(
           builder: (_) => MiniAppContainer(
             title: 'DApp Connect',
+            session: MiniAppSession(
+              module: 'ox_solana',
+              pageName: 'DappConnectPage',
+              title: 'DApp Connect',
+            ),
             child: DappConnectPage(showAppBar: false),
           ),
         ),
@@ -1535,6 +1546,11 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
         MaterialPageRoute(
           builder: (_) => MiniAppContainer(
             title: 'Torque Quests',
+            session: MiniAppSession(
+              module: 'ox_solana',
+              pageName: 'TorqueQuestsPage',
+              title: 'Torque Quests',
+            ),
             child: TorqueQuestsPage(showAppBar: false),
           ),
         ),
