@@ -111,6 +111,67 @@ extension ChatSessionListPageUI on ChatSessionListPageState{
     );
   }
 
+  Widget _buildMiniAppsSection() {
+    if (!_isLogin) return SizedBox();
+    final items = [
+      _MiniAppItem('🎵', 'Audius', 'ox_solana', 'AudiusPage'),
+      _MiniAppItem('🖼️', 'NFT', 'ox_solana', 'NftGalleryPage'),
+      _MiniAppItem('🎫', 'KYD', 'ox_solana', 'KydEventsPage'),
+      _MiniAppItem('🔁', 'Swap', 'ox_solana', 'SwapPage'),
+      _MiniAppItem('🎯', 'Torque', 'ox_solana', 'TorqueQuestsPage'),
+      _MiniAppItem('💼', 'Wallet', 'ox_solana', 'SolanaWalletPage'),
+    ];
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16.px, 4.px, 16.px, 8.px),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('小程序', style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
+              Spacer(),
+              Text('Solana', style: TextStyle(color: ThemeColor.color110, fontSize: 11)),
+            ],
+          ),
+          SizedBox(height: 8.px),
+          SizedBox(
+            height: 78.px,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (ctx, i) => _buildMiniAppItem(items[i]),
+              separatorBuilder: (_, __) => SizedBox(width: 10.px),
+              itemCount: items.length,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniAppItem(_MiniAppItem item) {
+    return GestureDetector(
+      onTap: () => OXModuleService.pushPage(context, item.module, item.page, {}),
+      child: Container(
+        width: 90.px,
+        padding: EdgeInsets.symmetric(vertical: 10.px),
+        decoration: BoxDecoration(
+          color: ThemeColor.color180,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ThemeColor.color160),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(item.emoji, style: TextStyle(fontSize: 22)),
+            SizedBox(height: 6.px),
+            Text(item.title, style: TextStyle(color: ThemeColor.color0, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildListViewItem(context, int index) {
     if(index >= _msgDatas.length) return SizedBox();
     ChatSessionModelISAR item = _msgDatas[index];
@@ -592,4 +653,12 @@ class _Style {
       color: Colors.white,
     );
   }
+}
+
+class _MiniAppItem {
+  final String emoji;
+  final String title;
+  final String module;
+  final String page;
+  _MiniAppItem(this.emoji, this.title, this.module, this.page);
 }
