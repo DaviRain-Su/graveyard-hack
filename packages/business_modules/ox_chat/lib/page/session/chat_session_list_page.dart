@@ -43,6 +43,7 @@ import 'package:ox_common/widgets/highlighted_clickable_text.dart';
 import 'package:ox_localizable/ox_localizable.dart';
 import 'package:ox_module_service/ox_module_service.dart';
 import 'package:ox_theme/ox_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'chat_session_list_page_ui.dart';
 
@@ -73,6 +74,8 @@ class ChatSessionListPageState extends BasePageState<ChatSessionListPage>
   GlobalKey? _latestGlobalKey;
   bool addAutomaticKeepAlives = true;
   bool addRepaintBoundaries = true;
+  List<String> _recentMiniApps = [];
+  static const String _miniAppsKey = 'ox_chat_recent_mini_apps';
 
   @override
   void initState() {
@@ -87,6 +90,7 @@ class ChatSessionListPageState extends BasePageState<ChatSessionListPage>
     OXUserInfoManager.sharedInstance.addObserver(this);
     Localized.addLocaleChangedCallback(onLocaleChange); //fetchNewestNotice
     _merge();
+    _loadRecentMiniApps();
     SchemeHelper.tryHandlerForOpenAppScheme();
   }
 
@@ -105,6 +109,28 @@ class ChatSessionListPageState extends BasePageState<ChatSessionListPage>
     }
     super.dispose();
   }
+
+  Future<void> _loadRecentMiniApps() async {
+    final prefs = await SharedPreferences.getInstance();
+    _recentMiniApps = prefs.getStringList(_miniAppsKey) ?? [];
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _saveRecentMiniApps() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_miniAppsKey, _recentMiniApps);
+  }
+
+  void onMiniAppTap(String id) {
+    _recentMiniApps.remove(id);
+    _recentMiniApps.insert(0, id);
+    if (_recentMiniApps.length > 6) {
+      _recentMiniApps = _recentMiniApps.take(6).toList();
+    }
+    _saveRecentMiniApps();
+  }
+
+  List<String> get recentMiniApps => _recentMiniApps;
 
   @override
   String get routeName => 'CommunityMessageView';

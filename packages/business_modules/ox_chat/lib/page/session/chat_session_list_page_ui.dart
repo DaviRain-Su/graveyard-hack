@@ -114,13 +114,23 @@ extension ChatSessionListPageUI on ChatSessionListPageState{
   Widget _buildMiniAppsSection() {
     if (!_isLogin) return SizedBox();
     final items = [
-      _MiniAppItem('🎵', 'Audius', 'ox_solana', 'AudiusPage'),
-      _MiniAppItem('🖼️', 'NFT', 'ox_solana', 'NftGalleryPage'),
-      _MiniAppItem('🎫', 'KYD', 'ox_solana', 'KydEventsPage'),
-      _MiniAppItem('🔁', 'Swap', 'ox_solana', 'SwapPage'),
-      _MiniAppItem('🎯', 'Torque', 'ox_solana', 'TorqueQuestsPage'),
-      _MiniAppItem('💼', 'Wallet', 'ox_solana', 'SolanaWalletPage'),
+      _MiniAppItem('audius', '🎵', 'Audius', 'ox_solana', 'AudiusPage'),
+      _MiniAppItem('nft', '🖼️', 'NFT', 'ox_solana', 'NftGalleryPage'),
+      _MiniAppItem('kyd', '🎫', 'KYD', 'ox_solana', 'KydEventsPage'),
+      _MiniAppItem('swap', '🔁', 'Swap', 'ox_solana', 'SwapPage'),
+      _MiniAppItem('torque', '🎯', 'Torque', 'ox_solana', 'TorqueQuestsPage'),
+      _MiniAppItem('wallet', '💼', 'Wallet', 'ox_solana', 'SolanaWalletPage'),
     ];
+
+    final recent = recentMiniApps;
+    items.sort((a, b) {
+      final ai = recent.indexOf(a.id);
+      final bi = recent.indexOf(b.id);
+      if (ai == -1 && bi == -1) return 0;
+      if (ai == -1) return 1;
+      if (bi == -1) return -1;
+      return ai.compareTo(bi);
+    });
 
     return Container(
       padding: EdgeInsets.fromLTRB(16.px, 4.px, 16.px, 8.px),
@@ -131,16 +141,16 @@ extension ChatSessionListPageUI on ChatSessionListPageState{
             children: [
               Text('小程序', style: TextStyle(color: ThemeColor.color0, fontSize: 14, fontWeight: FontWeight.w600)),
               Spacer(),
-              Text('Solana', style: TextStyle(color: ThemeColor.color110, fontSize: 11)),
+              Text('最近使用', style: TextStyle(color: ThemeColor.color110, fontSize: 11)),
             ],
           ),
           SizedBox(height: 8.px),
           SizedBox(
-            height: 78.px,
+            height: 96.px,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemBuilder: (ctx, i) => _buildMiniAppItem(items[i]),
-              separatorBuilder: (_, __) => SizedBox(width: 10.px),
+              itemBuilder: (ctx, i) => _buildMiniAppItem(items[i], recent.contains(items[i].id)),
+              separatorBuilder: (_, __) => SizedBox(width: 12.px),
               itemCount: items.length,
             ),
           ),
@@ -149,23 +159,44 @@ extension ChatSessionListPageUI on ChatSessionListPageState{
     );
   }
 
-  Widget _buildMiniAppItem(_MiniAppItem item) {
+  Widget _buildMiniAppItem(_MiniAppItem item, bool isRecent) {
     return GestureDetector(
-      onTap: () => OXModuleService.pushPage(context, item.module, item.page, {}),
+      onTap: () {
+        onMiniAppTap(item.id);
+        OXModuleService.pushPage(context, item.module, item.page, {});
+      },
       child: Container(
-        width: 90.px,
-        padding: EdgeInsets.symmetric(vertical: 10.px),
+        width: 110.px,
+        padding: EdgeInsets.symmetric(vertical: 10.px, horizontal: 8.px),
         decoration: BoxDecoration(
           color: ThemeColor.color180,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: ThemeColor.color160),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(item.emoji, style: TextStyle(fontSize: 22)),
+            Container(
+              width: 38.px,
+              height: 38.px,
+              decoration: BoxDecoration(
+                color: ThemeColor.color190,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(child: Text(item.emoji, style: TextStyle(fontSize: 22))),
+            ),
             SizedBox(height: 6.px),
-            Text(item.title, style: TextStyle(color: ThemeColor.color0, fontSize: 12)),
+            Text(item.title, style: TextStyle(color: ThemeColor.color0, fontSize: 12, fontWeight: FontWeight.w600)),
+            SizedBox(height: 2.px),
+            if (isRecent)
+              Text('最近使用', style: TextStyle(color: ThemeColor.color110, fontSize: 10)),
           ],
         ),
       ),
@@ -656,9 +687,10 @@ class _Style {
 }
 
 class _MiniAppItem {
+  final String id;
   final String emoji;
   final String title;
   final String module;
   final String page;
-  _MiniAppItem(this.emoji, this.title, this.module, this.page);
+  _MiniAppItem(this.id, this.emoji, this.title, this.module, this.page);
 }
