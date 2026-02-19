@@ -8,7 +8,8 @@ import '../services/dapp_connect_service.dart';
 
 /// DApp connection management page — view, connect, and disconnect dApps
 class DappConnectPage extends StatefulWidget {
-  const DappConnectPage({super.key});
+  final bool showAppBar;
+  const DappConnectPage({super.key, this.showAppBar = true});
 
   @override
   State<DappConnectPage> createState() => _DappConnectPageState();
@@ -40,17 +41,19 @@ class _DappConnectPageState extends State<DappConnectPage> {
 
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: CommonAppBar(
-        title: '🔗 DApp Connections',
-        backgroundColor: ThemeColor.color190,
-        actions: [
-          if (sessions.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.link_off, color: ThemeColor.color100),
-              onPressed: _disconnectAll,
-            ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? CommonAppBar(
+              title: '🔗 DApp Connections',
+              backgroundColor: ThemeColor.color190,
+              actions: [
+                if (sessions.isNotEmpty)
+                  IconButton(
+                    icon: Icon(Icons.link_off, color: ThemeColor.color100),
+                    onPressed: _disconnectAll,
+                  ),
+              ],
+            )
+          : null,
       body: sessions.isEmpty ? _buildEmpty() : _buildList(sessions),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showConnectDialog,

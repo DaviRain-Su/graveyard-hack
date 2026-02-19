@@ -14,7 +14,8 @@ import '../services/solana_wallet_service.dart';
 ///   - View rewards and payouts
 ///   - Share referral links
 class TorqueQuestsPage extends StatefulWidget {
-  const TorqueQuestsPage({super.key});
+  final bool showAppBar;
+  const TorqueQuestsPage({super.key, this.showAppBar = true});
 
   @override
   State<TorqueQuestsPage> createState() => _TorqueQuestsPageState();
@@ -104,33 +105,35 @@ class _TorqueQuestsPageState extends State<TorqueQuestsPage> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: AppBar(
-        backgroundColor: ThemeColor.color190,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('🎯', style: TextStyle(fontSize: 20)),
-            SizedBox(width: 6),
-            Text('Torque Quests', style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          if (_torque.isLoggedIn)
-            IconButton(
-              icon: Icon(Icons.refresh, color: ThemeColor.color0),
-              onPressed: _loadData,
-            ),
-          if (_torque.isLoggedIn)
-            IconButton(
-              icon: Icon(Icons.logout, color: ThemeColor.color110),
-              onPressed: () async {
-                await _torque.logout();
-                setState(() { _offers = []; _journeys = []; _payouts = []; });
-              },
-            ),
-        ],
-        iconTheme: IconThemeData(color: ThemeColor.color0),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              backgroundColor: ThemeColor.color190,
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🎯', style: TextStyle(fontSize: 20)),
+                  SizedBox(width: 6),
+                  Text('Torque Quests', style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              actions: [
+                if (_torque.isLoggedIn)
+                  IconButton(
+                    icon: Icon(Icons.refresh, color: ThemeColor.color0),
+                    onPressed: _loadData,
+                  ),
+                if (_torque.isLoggedIn)
+                  IconButton(
+                    icon: Icon(Icons.logout, color: ThemeColor.color110),
+                    onPressed: () async {
+                      await _torque.logout();
+                      setState(() { _offers = []; _journeys = []; _payouts = []; });
+                    },
+                  ),
+              ],
+              iconTheme: IconThemeData(color: ThemeColor.color0),
+            )
+          : null,
       body: _torque.isLoggedIn ? _buildLoggedInView() : _buildLoginView(),
     );
   }

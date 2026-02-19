@@ -102,7 +102,13 @@ class OXSolana extends OXFlutterModule {
           ),
         );
       case 'SwapPage':
-        return OXNavigator.pushPage(context, (ctx) => const SwapPage());
+        return OXNavigator.pushPage(
+          context,
+          (ctx) => MiniAppContainer(
+            title: 'Swap',
+            child: SwapPage(showAppBar: false),
+          ),
+        );
       case 'RedPacketPage':
         return OXNavigator.pushPage(
             context,
@@ -150,7 +156,21 @@ class OXSolana extends OXFlutterModule {
           ),
         );
       case 'DappConnectPage':
-        return OXNavigator.pushPage(context, (ctx) => const DappConnectPage());
+        return OXNavigator.pushPage(
+          context,
+          (ctx) => MiniAppContainer(
+            title: 'DApp Connect',
+            child: DappConnectPage(showAppBar: false),
+          ),
+        );
+      case 'TorqueQuestsPage':
+        return OXNavigator.pushPage(
+          context,
+          (ctx) => MiniAppContainer(
+            title: 'Torque Quests',
+            child: TorqueQuestsPage(showAppBar: false),
+          ),
+        );
       case 'KydEventsPage':
         final onEventSelected = params?['onEventSelected'];
         if (onEventSelected != null) {

@@ -11,7 +11,8 @@ import '../services/jupiter_service.dart';
 import '../services/solana_wallet_service.dart';
 
 class SwapPage extends StatefulWidget {
-  const SwapPage({super.key});
+  final bool showAppBar;
+  const SwapPage({super.key, this.showAppBar = true});
 
   @override
   State<SwapPage> createState() => _SwapPageState();
@@ -35,10 +36,12 @@ class _SwapPageState extends State<SwapPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: CommonAppBar(
-        title: 'Swap',
-        backgroundColor: ThemeColor.color190,
-      ),
+      appBar: widget.showAppBar
+          ? CommonAppBar(
+              title: 'Swap',
+              backgroundColor: ThemeColor.color190,
+            )
+          : null,
       body: Padding(
         padding: EdgeInsets.all(Adapt.px(16)),
         child: Column(

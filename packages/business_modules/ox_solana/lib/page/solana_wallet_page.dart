@@ -11,6 +11,7 @@ import 'package:ox_module_service/ox_module_service.dart';
 import '../services/solana_wallet_service.dart';
 import '../services/tapestry_service.dart';
 import 'demo_checklist_page.dart';
+import '../widgets/mini_app_container.dart';
 import '../services/price_service.dart';
 import '../widgets/token_list_widget.dart';
 import 'send_sol_page.dart';
@@ -246,8 +247,15 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
                   icon: Icons.swap_horiz,
                   label: 'Swap',
                   color: const Color(0xFFF39C12),
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const SwapPage())),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MiniAppContainer(
+                        title: 'Swap',
+                        child: SwapPage(showAppBar: false),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               SizedBox(width: Adapt.px(10)),
@@ -1384,7 +1392,12 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const DappConnectPage()),
+        MaterialPageRoute(
+          builder: (_) => MiniAppContainer(
+            title: 'DApp Connect',
+            child: DappConnectPage(showAppBar: false),
+          ),
+        ),
       ),
       child: Container(
         padding: EdgeInsets.all(Adapt.px(16)),
@@ -1519,7 +1532,12 @@ class _SolanaWalletPageState extends State<SolanaWalletPage> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const TorqueQuestsPage()),
+        MaterialPageRoute(
+          builder: (_) => MiniAppContainer(
+            title: 'Torque Quests',
+            child: TorqueQuestsPage(showAppBar: false),
+          ),
+        ),
       ),
       child: Container(
         padding: EdgeInsets.all(Adapt.px(16)),
