@@ -12,12 +12,14 @@ class NftGalleryPage extends StatefulWidget {
   final Function(Map<String, dynamic>)? onNftSelected;
   final bool pickerMode;
   final String? focusMint;
+  final bool showAppBar;
 
   const NftGalleryPage({
     super.key,
     this.onNftSelected,
     this.pickerMode = false,
     this.focusMint,
+    this.showAppBar = true,
   });
 
   @override
@@ -90,35 +92,37 @@ class _NftGalleryPageState extends State<NftGalleryPage> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: AppBar(
-        backgroundColor: ThemeColor.color190,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.pickerMode ? '🖼️ Pick NFT to Share' : '🖼️ NFT Gallery',
-          style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: ThemeColor.color100),
-            onPressed: _loadNfts,
-          ),
-        ],
-        bottom: widget.pickerMode ? null : TabBar(
-          controller: _tabController,
-          indicatorColor: Color(0xFF9945FF),
-          labelColor: Color(0xFF9945FF),
-          unselectedLabelColor: ThemeColor.color100,
-          tabs: [
-            Tab(text: 'All NFTs'),
-            Tab(text: '💧 DRiP'),
-            Tab(text: '🔍 Discover'),
-          ],
-        ),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              backgroundColor: ThemeColor.color190,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Text(
+                widget.pickerMode ? '🖼️ Pick NFT to Share' : '🖼️ NFT Gallery',
+                style: TextStyle(color: ThemeColor.color0, fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.refresh, color: ThemeColor.color100),
+                  onPressed: _loadNfts,
+                ),
+              ],
+              bottom: widget.pickerMode ? null : TabBar(
+                controller: _tabController,
+                indicatorColor: Color(0xFF9945FF),
+                labelColor: Color(0xFF9945FF),
+                unselectedLabelColor: ThemeColor.color100,
+                tabs: [
+                  Tab(text: 'All NFTs'),
+                  Tab(text: '💧 DRiP'),
+                  Tab(text: '🔍 Discover'),
+                ],
+              ),
+            )
+          : null,
       body: widget.pickerMode
           ? _buildBody()
           : TabBarView(

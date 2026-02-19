@@ -28,6 +28,7 @@ import 'page/torque_quests_page.dart';
 import 'services/kyd_service.dart';
 import 'page/kyd_events_page.dart';
 import 'widgets/floating_music_player.dart';
+import 'widgets/mini_app_container.dart';
 
 class OXSolana extends OXFlutterModule {
   static final OXSolana shared = OXSolana._();
@@ -125,18 +126,29 @@ class OXSolana extends OXFlutterModule {
         }
         return OXNavigator.pushPage(
             context,
-            (ctx) => AudiusPage(
-                  onTrackSelected: typedCallback,
-                  autoPlayTitle: params?['autoPlayTitle'],
-                  autoPlayArtist: params?['autoPlayArtist'],
-                  autoPlay: params?['autoPlay'] == true,
+            (ctx) => MiniAppContainer(
+                  title: 'Audius',
+                  child: AudiusPage(
+                    onTrackSelected: typedCallback,
+                    autoPlayTitle: params?['autoPlayTitle'],
+                    autoPlayArtist: params?['autoPlayArtist'],
+                    autoPlay: params?['autoPlay'] == true,
+                    showAppBar: false,
+                  ),
                 ));
       case 'NftGalleryPage':
-        return OXNavigator.pushPage(context, (ctx) => NftGalleryPage(
-          pickerMode: params?['pickerMode'] ?? false,
-          onNftSelected: params?['onNftSelected'],
-          focusMint: params?['mint'],
-        ));
+        return OXNavigator.pushPage(
+          context,
+          (ctx) => MiniAppContainer(
+            title: 'NFT Gallery',
+            child: NftGalleryPage(
+              pickerMode: params?['pickerMode'] ?? false,
+              onNftSelected: params?['onNftSelected'],
+              focusMint: params?['mint'],
+              showAppBar: false,
+            ),
+          ),
+        );
       case 'DappConnectPage':
         return OXNavigator.pushPage(context, (ctx) => const DappConnectPage());
       case 'KydEventsPage':
@@ -144,24 +156,35 @@ class OXSolana extends OXFlutterModule {
         if (onEventSelected != null) {
           return OXNavigator.pushPage(
             context,
-            (ctx) => KydEventsPage(
-              onEventSelected: (event) {
-                // Convert KydEvent to Map at module boundary
-                onEventSelected({
-                  'name': event.name,
-                  'display_start_at': event.displayStartAt ?? '',
-                  'venue_name': event.venue?.name ?? '',
-                  'share_url': KydService.instance.getShareUrl(event),
-                  'image_url': event.imageUrl ?? '',
-                  'id': event.id,
-                });
-              },
+            (ctx) => MiniAppContainer(
+              title: 'KYD Events',
+              child: KydEventsPage(
+                onEventSelected: (event) {
+                  // Convert KydEvent to Map at module boundary
+                  onEventSelected({
+                    'name': event.name,
+                    'display_start_at': event.displayStartAt ?? '',
+                    'venue_name': event.venue?.name ?? '',
+                    'share_url': KydService.instance.getShareUrl(event),
+                    'image_url': event.imageUrl ?? '',
+                    'id': event.id,
+                  });
+                },
+                showAppBar: false,
+              ),
             ),
           );
         }
-        return OXNavigator.pushPage(context, (ctx) => KydEventsPage(
-          eventId: params?['eventId'],
-        ));
+        return OXNavigator.pushPage(
+          context,
+          (ctx) => MiniAppContainer(
+            title: 'KYD Events',
+            child: KydEventsPage(
+              eventId: params?['eventId'],
+              showAppBar: false,
+            ),
+          ),
+        );
     }
     return null;
   }

@@ -12,8 +12,14 @@ class KydEventsPage extends StatefulWidget {
   final Function(KydEvent event)? onEventSelected;
   /// Optional: open event detail directly
   final String? eventId;
+  final bool showAppBar;
 
-  const KydEventsPage({Key? key, this.onEventSelected, this.eventId}) : super(key: key);
+  const KydEventsPage({
+    Key? key,
+    this.onEventSelected,
+    this.eventId,
+    this.showAppBar = true,
+  }) : super(key: key);
 
   @override
   State<KydEventsPage> createState() => _KydEventsPageState();
@@ -92,35 +98,37 @@ class _KydEventsPageState extends State<KydEventsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: AppBar(
-        backgroundColor: ThemeColor.color190,
-        elevation: 0,
-        leading: _selectedEvent != null
-            ? IconButton(
-                icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
-                onPressed: () => setState(() => _selectedEvent = null),
-              )
-            : IconButton(
-                icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
-                onPressed: () => Navigator.pop(context),
-              ),
-        title: Text(
-          _selectedEvent != null ? 'Event Details' : '🎫 KYD Events',
-          style: TextStyle(
-            color: ThemeColor.color0,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: _selectedEvent == null
-            ? [
-                IconButton(
-                  icon: Icon(Icons.refresh, color: ThemeColor.color0),
-                  onPressed: () => _loadEvents(force: true),
+      appBar: widget.showAppBar
+          ? AppBar(
+              backgroundColor: ThemeColor.color190,
+              elevation: 0,
+              leading: _selectedEvent != null
+                  ? IconButton(
+                      icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
+                      onPressed: () => setState(() => _selectedEvent = null),
+                    )
+                  : IconButton(
+                      icon: Icon(Icons.arrow_back, color: ThemeColor.color0),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+              title: Text(
+                _selectedEvent != null ? 'Event Details' : '🎫 KYD Events',
+                style: TextStyle(
+                  color: ThemeColor.color0,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
-              ]
-            : null,
-      ),
+              ),
+              actions: _selectedEvent == null
+                  ? [
+                      IconButton(
+                        icon: Icon(Icons.refresh, color: ThemeColor.color0),
+                        onPressed: () => _loadEvents(force: true),
+                      ),
+                    ]
+                  : null,
+            )
+          : null,
       body: _selectedEvent != null
           ? _buildDetailView(_selectedEvent!)
           : _buildEventsList(),

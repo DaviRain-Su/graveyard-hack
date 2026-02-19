@@ -17,6 +17,7 @@ class AudiusPage extends StatefulWidget {
   final String? autoPlayTitle;
   final String? autoPlayArtist;
   final bool autoPlay;
+  final bool showAppBar;
 
   const AudiusPage({
     super.key,
@@ -24,6 +25,7 @@ class AudiusPage extends StatefulWidget {
     this.autoPlayTitle,
     this.autoPlayArtist,
     this.autoPlay = false,
+    this.showAppBar = true,
   });
 
   @override
@@ -121,10 +123,12 @@ class _AudiusPageState extends State<AudiusPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.color190,
-      appBar: CommonAppBar(
-        title: widget.onTrackSelected != null ? '🎵 Pick a Track to Share' : '🎵 Audius Music',
-        backgroundColor: ThemeColor.color190,
-      ),
+      appBar: widget.showAppBar
+          ? CommonAppBar(
+              title: widget.onTrackSelected != null ? '🎵 Pick a Track to Share' : '🎵 Audius Music',
+              backgroundColor: ThemeColor.color190,
+            )
+          : null,
       body: Column(
         children: [
           // Search bar
